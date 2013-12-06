@@ -33,6 +33,7 @@ char program[] = "CUDAPm1 v0.20";
 
 #include "cuda_safecalls.h"
 #include "parse.h"
+#include "CUDAPm1.h"
 #include "rho.h"
 
 #include "complex_math.cu"
@@ -2431,8 +2432,6 @@ _kbhit (void)
 #include <conio.h>
 #endif
 
-int interact(void); // defined below everything else
-
 int get_bit(int location, unsigned *control)
 {
   int digit = location / 32;
@@ -4252,50 +4251,40 @@ while (argc > 1)
     }
 }
 
-int interact(void)
-{
+int interact(void) {
   int c = getchar ();
-  if (c == 'p')
-    if (polite_f)
-	  {
+	switch (c) {
+		case 'p':
+			if (polite_f) {
 	    polite_f = 0;
 	    printf ("   -polite 0\n");
-	  }
-    else
-     {
+			} else {
       polite_f = 1;
       printf ("   -polite %d\n", polite);
      }
-  else if (c == 't')
-    {
+			break;
+		case 't':
       t_f = 0;
       printf ("   disabling -t\n");
-    }
-  else if (c == 's')
-    if (s_f == 1)
-      {
+			break;
+		case 's':
+			if (s_f == 1) {
         s_f = 2;
         printf ("   disabling -s\n");
-      }
-    else if (s_f == 2)
-      {
+			} else if (s_f == 2) {
         s_f = 1;
         printf ("   enabling -s\n");
       }
-   if (c == 'F')
-      {
+			break;
+		case 'F':
          printf(" -- Increasing fft length.\n");
          fftlen++;
           return 1;
-      }
-   if (c == 'f')
-      {
+		case 'f':
          printf(" -- Decreasing fft length.\n");
          fftlen--;
          return 1;
-      }
-   if (c == 'k')
-      {
+		case 'k':
          printf(" -- fft length reset cancelled.\n");
          return 2;
       }
