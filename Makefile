@@ -76,10 +76,10 @@ debug: $(DEBUG_BIN)
 test: test-b1 test-b2
 
 test-b1: $(BIN) clean-test
-	./$(BIN) 968819 -b1 20000
+	./$(BIN) -noinfo 968819 -b1 20000
 
 test-b2: $(BIN) clean-test
-	./$(BIN) 7990427 -b1 983 -b2 124000
+	./$(BIN) -noinfo 7990427 -b1 983 -b2 124000
 
 clean-test:
 	rm -f *968819* *7990427*

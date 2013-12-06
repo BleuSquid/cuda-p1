@@ -4054,6 +4054,12 @@ while (argc > 1)
           argv++;
           argc--;
         }
+	  else if (strcmp (argv[1], "-noinfo") == 0)
+        {
+          d_f = 0;
+          argv++;
+          argc--;
+        }
       else if (strcmp (argv[1], "-cufftbench") == 0)
 	{
 	  if (argc < 5 || argv[2][0] == '-' || argv[3][0] == '-' || argv[4][0] == '-')
