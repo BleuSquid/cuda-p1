@@ -67,14 +67,29 @@ CUDAPm1.o: CUDAPm1.cu parse.h cuda_safecalls.h rho.h
 %.o: %.c %.h
 	$(CC) $(CFLAGS) -c $<
 
-clean:
+clean: clean-test
 	rm -f *.o *~
 	rm -f $(NAME) debug_$(NAME) test_$(NAME)
 
 debug: $(DEBUG_BIN)
 
+test: test-b1 test-b2
+
+test-b1: $(BIN) clean-test
+	./$(BIN) 968819 -b1 20000
+
+test-b2: $(BIN) clean-test
+	./$(BIN) 7990427 -b1 983 -b2 124000
+
+clean-test:
+	rm -f *968819* *7990427*
+
+
 help:
 	@echo "\n\"make\"           builds CUDAPm1"
 	@echo "\"make clean\"     removes object files"
 	@echo "\"make debug\"     creates a debug build"
-	@echo "\"make help\"      prints this message\n"
+	@echo "\"make help\"      prints this message"
+	@echo "\"make test-b1\"   tests a factor found via a small b1"
+	@echo "\"make test-b2\"   tests a factor found via a small b2"
+	@echo "\"make test\"      run both tests"
