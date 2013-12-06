@@ -41,7 +41,7 @@ extern "C" int IniGetStr(char* ini_file, char* name, char* str, char* dfault);
 extern "C" int file_exists(char* filename); // nonzero if file exists
 extern "C" FILE* fopen_and_lock(const char *path, const char *mode);
 extern "C" int unlock_and_fclose(FILE* f);
-
+extern "C" int isprime(unsigned int n);
 
 #ifndef _MSC_VER
 #include <sys/time.h>
