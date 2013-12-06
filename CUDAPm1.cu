@@ -481,9 +481,10 @@ __global__ void apply_weights (double *g_out,
   val[0] = g_in[index];
   val[1] = g_in[index + 1];
   ttp_temp[0] = g_ttmp[index];
-  ttp_temp[1] = g_ttmp[index + 1];
-  if(ttp_temp[0] < 0.0) test = 0;
-  if(ttp_temp[1] < 0.0) ttp_temp[1] = -ttp_temp[1];
+	ttp_temp[1] = fabs(g_ttmp[index + 1]);
+	
+	test = ttp_temp[0] < 0.0 ? 0 : 1;
+	
   g_out[index + 1] = (double) val[1] * ttp_temp[1];
   ttp_temp[1] *= -g_ttp_inc[test];
   g_out[index] = (double) val[0] * ttp_temp[1];
@@ -499,13 +500,12 @@ __global__ void norm1a (double *g_in,
 		                     int g_err_flag)
 {
   long long int bigint[2];
-  int val[2], numbits[2] = {g_qn[0],g_qn[0]}, mask[2], shifted_carry;
+	int val[2], numbits[2] = {g_qn[0],g_qn[0]}, mask[2], shifted_carry, carry_tmp, err_tmp;
   double ttp_temp;
   const int index = (blockIdx.x * blockDim.x + threadIdx.x) << 1;
   const int index1 = blockIdx.x << 1;
   __shared__ int carry[1024 + 1];
 
-  {
     double tval[2], trint[2];
     float ferr[2];
 
@@ -513,13 +513,11 @@ __global__ void norm1a (double *g_in,
     ttp_temp = g_ttmp[index + 1];
     trint[0] = g_in[index];
     trint[1] = g_in[index + 1];
-    if(tval[0] < 0.0)
-    {
+	if(tval[0] < 0.0) {
       numbits[0]++;
       tval[0] = -tval[0];
     }
-    if(ttp_temp < 0.0)
-    {
+	if(ttp_temp < 0.0) {
       numbits[1]++;
       ttp_temp = -ttp_temp;
     }
@@ -527,55 +525,57 @@ __global__ void norm1a (double *g_in,
     tval[0] = trint[0] * tval[0];
     tval[1] = trint[1] * tval[1];
     trint[0] = RINT (tval[0]);
-    ferr[0] = tval[0] - trint[0];
-    ferr[0] = fabs (ferr[0]);
+	ferr[0] = fabs(tval[0] - trint[0]);
     bigint[0] = (long long int) trint[0];
     trint[1] = RINT (tval[1]);
-    ferr[1] = tval[1] - trint[1];
-    ferr[1] = fabs (ferr[1]);
+	ferr[1] = fabs(tval[1] - trint[1]);
     bigint[1] = (long long int) trint[1];
     mask[0] = -1 << numbits[0];
     mask[1] = -1 << numbits[1];
-    if(ferr[0] < ferr[1]) ferr[0] = ferr[1];
-    if (ferr[0] > maxerr) atomicMax((int*) g_err, __float_as_int(ferr[0]));
-  }
+	ferr[0] = fmax(ferr[0], ferr[1]);
+
+	err_tmp = __float_as_int(ferr[0]);
+
+	if (ferr[0] > maxerr)
+		atomicMax((int*) g_err, err_tmp);
   val[1] = ((int) bigint[1]) & ~mask[1];
   carry[threadIdx.x + 1] = (int) (bigint[1] >> numbits[1]);
+	__syncthreads();
+
+	carry_tmp = carry[threadIdx.x];
   val[0] = ((int) bigint[0]) & ~mask[0];
   val[1] += (int) (bigint[0] >> numbits[0]);
-  __syncthreads ();
 
-  if (threadIdx.x) val[0] += carry[threadIdx.x];
+	if (threadIdx.x)
+		val[0] += carry_tmp;
   shifted_carry = val[1] - (mask[1] >> 1);
   val[1] = val[1] - (shifted_carry & mask[1]);
   carry[threadIdx.x] = shifted_carry >> numbits[1];
+	__syncthreads();
+
+	carry_tmp = carry[threadIdx.x + 1] + carry[threadIdx.x];
   shifted_carry = val[0] - (mask[0] >> 1);
   val[0] = val[0] - (shifted_carry & mask[0]);
   val[1] += shifted_carry >> numbits[0];
-  __syncthreads ();
 
-  if (threadIdx.x == (blockDim.x - 1))
-  {
-    if (blockIdx.x == gridDim.x - 1) g_carry[0] = carry[threadIdx.x + 1] + carry[threadIdx.x];
-    else   g_carry[blockIdx.x + 1] =  carry[threadIdx.x + 1] + carry[threadIdx.x];
+	if (threadIdx.x == (blockDim.x - 1)) {
+		if (blockIdx.x == gridDim.x - 1)
+			g_carry[0] = carry_tmp;
+		else
+			g_carry[blockIdx.x + 1] =  carry_tmp;
   }
 
-  if (threadIdx.x)
-  {
+	if (threadIdx.x) {
     val[0] += carry[threadIdx.x - 1];
-    {
+
         g_in[index + 1] = (double) val[1] * ttp_temp;
         ttp_temp *= -g_ttp_inc[numbits[0] == g_qn[0]];
         g_in[index] = (double) val[0] * ttp_temp;
-    }
-    if(g_err_flag)
-    {
+		if (g_err_flag) {
       g_xint[index + 1] = val[1];
       g_xint[index] = val[0];
     }
-  }
-  else
-  {
+	} else {
     g_data[index1] = val[0];
     g_data[index1 + 1] = val[1];
   }
