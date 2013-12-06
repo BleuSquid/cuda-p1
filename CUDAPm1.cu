@@ -3905,7 +3905,8 @@ int main (int argc, char *argv[])
 	      fftlen = f_f; // fftlen and AID change between tests, so be sure to reset them
 	      AID[0] = 0;
 
-  	      error = get_next_assignment(input_filename, &q, &fftlen, &tfdepth, &llsaved, &AID);
+  	      error = get_next_assignment(input_filename, &q, &fftlen, &tfdepth, &llsaved, &AID, &g_b1_commandline, &g_b2_commandline);
+
                /* Guaranteed to write to fftlen ONLY if specified on workfile line, so that if unspecified, the pre-set default is kept. */
 	      if( error > 0) exit (2); // get_next_assignment prints warning message
 	      #ifdef EBUG

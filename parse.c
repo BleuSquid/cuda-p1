@@ -216,12 +216,20 @@ enum PARSE_WARNINGS
   NONBLANK_LINE
 };
 
-struct ASSIGNMENT
-{
+enum ASSIGNMENT_TYPE {
+	NONE,
+	PFACTOR,
+	PMINUS1
+};
+
+struct ASSIGNMENT {
+	enum ASSIGNMENT_TYPE type;
 	int exponent;
 	int fft_length;
 	int tf_depth;
 	int ll_saved;
+	int b1;
+	int b2;
 	char hex_key[MAX_LINE_LENGTH+1];	// optional assignment key....
 	char comment[MAX_LINE_LENGTH+1];	// optional comment -- it followed the assignment on the same line.
 };
@@ -260,6 +268,7 @@ output
   assignment->tf_depth = 0;
   assignment->ll_saved = 0;
   assignment->hex_key[0] = 0;
+  assignment->type = NONE;
 
   if(NULL==fgets(line, MAX_LINE_LENGTH+1, f_in))
   {
@@ -295,121 +304,139 @@ output
 
   ptr=line;
   while (('\0'!=ptr[0]) && isspace(ptr[0]))	// skip leading spaces
-    ptr++;
+	  ptr++;
   if ('\0' == ptr[0])	// blank line...
-    return BLANK_LINE;
+	  return BLANK_LINE;
   if( ('\\'== ptr[0]) && ('\\'==ptr[1]) )
-    return NONBLANK_LINE;		// it's a comment, so ignore....don't care about long lines either..
+	  return NONBLANK_LINE;		// it's a comment, so ignore....don't care about long lines either..
   if( ('/' == ptr[0]) && ('/'==ptr[1]) )
-    return NONBLANK_LINE;		// it's a comment, so ignore....don't care about long lines either..
+	  return NONBLANK_LINE;		// it's a comment, so ignore....don't care about long lines either..
   if( ('#' == ptr[0]) )
-    return NONBLANK_LINE;		// it's a comment, so ignore....don't care about long lines either..
-  if ( (strncasecmp("Pfactor=", ptr, 8) != 0) ) // does the line start with "Pfactor="?
-                                                     // (case-insensitive)
-    return NO_TEST_EQUAL;
+	  return NONBLANK_LINE;		// it's a comment, so ignore....don't care about long lines either..
+
+  if (strncasecmp("Pfactor=",ptr,8) == 0)
+	  assignment->type=PFACTOR;
+  if (strncasecmp("Pminus1=",ptr,8) == 0)
+	  assignment->type=PMINUS1;
+
+  if (assignment->type==NONE) // does the line start with "Pfactor=" or "Pminus1="?
+	  // (case-insensitive)
+	  return NO_TEST_EQUAL;
 
   ptr = 1+ strchr(ptr, '=');	// don't rescan..
   while (('\0'!=ptr[0]) && isspace(ptr[0]))	// ignore blanks...
-    ptr++;
+	  ptr++;
   number_of_commas = 0;
-  for(scanpos = 0; scanpos < strlen(ptr); scanpos++)
-  {
-    if(ptr[scanpos] == ',')
-      number_of_commas++; // count the number of ',' in the line
-    if ((ptr[scanpos] == '\\') && (ptr[scanpos+1] == '\\')) {
-      comment_on_line = '\\';
-      break;	// comment delimiter
-    }
-    if ((ptr[scanpos] == '/') && (ptr[scanpos+1] == '/')) {
-      comment_on_line = '/';
-      break;	// //comment delimiter
-    }
-    if (ptr[scanpos] == '#') {
-      comment_on_line = '#';
-      break;    // comment delimiter
-    }
+  
+  for(scanpos = 0; scanpos < strlen(ptr); scanpos++) {
+	  if(ptr[scanpos] == ',')
+		  number_of_commas++; // count the number of ',' in the line
+	  if ((ptr[scanpos] == '\\') && (ptr[scanpos+1] == '\\')) {
+		  comment_on_line = '\\';
+		  break;	// comment delimiter
+	  }
+	  
+	  if ((ptr[scanpos] == '/') && (ptr[scanpos+1] == '/')) {
+		  comment_on_line = '/';
+		  break;	// //comment delimiter
+	  }
+	  
+	  if (ptr[scanpos] == '#') {
+		  comment_on_line = '#';
+		  break;    // comment delimiter
+	  }
   }
   #ifdef EBUG
   printf("    Scanned %d commas\n", number_of_commas);
-  #endif
-  if (number_of_commas > 7)	// must have less than 8 commas... (possible fields are key,a,b,exp,c,tf,ll_saved,fft)
-    return INVALID_FORMAT;
-
+#endif
+  
+  // must have less than 8 commas... 
+  // possible fields are:
+  // 	Pfactor=key,a,b,exp,c,tf,ll_saved,fft
+  // 	Pminus1=key,a,b,exp,c,b1,b2,tf
+  if (number_of_commas > 7)
+	  return INVALID_FORMAT;
+  
   for(; number_of_commas >= 0; number_of_commas--) {
     // i is number of commas ahead of ptr (or, there's one more field than commas, so iterate n+1 times)
     while (isspace(ptr[0]))	// ignore blanks...
       ptr++;
-    if(number_of_commas > 0) // then there's at least one comma left
+    if (number_of_commas > 0) // then there's at least one comma left
       ptr_end = strchr(ptr, ','); // guaranteed that strchr isn't null because of the if
-    else if(comment_on_line) // no more commas, but there is a comment
+    else if (comment_on_line) // no more commas, but there is a comment
       ptr_end = strchr(ptr, comment_on_line); // (see declaration of c_on_l or lines 285,289,293 for explanation)
     else { // no commas or comments
       ptr_end = strchr(ptr, '\n');
-      if(ptr_end == NULL)
+      if (ptr_end == NULL)
         ptr_end = strchr(ptr, '\0');
     }
-    #ifdef EBUG
-    printf("    In main for() loop, %d commas left\n", number_of_commas);
-    #endif
-    for(ptr_start = ptr; ptr_start < ptr_end; ptr_start++) {
 
-      #ifdef EBUG
-      printf("      Looping on chars, ptr_start = %c\n", *ptr_start);
-      #endif
-      if( ('A' <= *ptr_start && *ptr_start <= 'F') || ('a' <= *ptr_start && *ptr_start <= 'f') ) {
-      // we have some sort of hex assignment key, or "N/A". Either way, it's an AID of some sort.
-        #ifdef EBUG
-        printf("      Branched on AID, trigger is %c\n", *ptr_start);
-        #endif
-        strcopy(assignment->hex_key, ptr, (ptr_end - ptr));
-        assignment->hex_key[ptr_end-ptr] = '\0';	// null-terminate key
-        #ifdef EBUG
-        printf("      Key is '%s'\n", assignment->hex_key);
-        #endif
-        goto outer_continue;
-      }
-      else if( *ptr_start == 'k' || *ptr_start == 'K' ) {
-      // we've found a fft length field.
-        #ifdef EBUG
-        printf("      Branched on FFT-K\n");
-        #endif
-        errno = 0;
-        proposed_fftlen = strtoul(ptr, &ptr2, 10) * 1024; // Don't forget the K ;)
-        if(ptr == ptr2 || ptr2 < ptr_start) // the second condition disallows space between the num and K, so "1444 K" will fail,
-          return INVALID_FORMAT;            // but it also disallows "1rrrK", so I think it's worth it.
-        if(errno != 0 || proposed_fftlen > INT_MAX)
-          return INVALID_DATA;
-        assignment->fft_length = proposed_fftlen;
-        goto outer_continue;
-      }
-      else if( *ptr_start == 'm' || *ptr_start == 'M' ) {
-      // we've found a fft length field.
-        #ifdef EBUG
-        printf("      Branched on FFT-M\n");
-        #endif
-        errno = 0;
-        proposed_fftlen = strtoul(ptr, &ptr2, 10) * 1024*1024; // Don't forget the M ;)
-        if(ptr == ptr2 || ptr2 < ptr_start) // the second condition disallows space between the num and K, so "1444 M" will fail,
-          return INVALID_FORMAT;            // but it also disallows "1rrrK", so I think it's worth it.
-        if(errno != 0 || proposed_fftlen > INT_MAX)
-          return INVALID_DATA;
-        assignment->fft_length = proposed_fftlen;
-        goto outer_continue;
+#ifdef EBUG
+	printf("    In main for() loop, %d commas left\n", number_of_commas);
+#endif
+	
+	for (ptr_start = ptr; ptr_start < ptr_end; ptr_start++) {
 
-      } else { // Not special, so we must continue checking the rest of the chars in the field
-        continue;
-      }
-    } // end inner for()
-    // Now we know there's nothing special about this field, so
-    // we must assume it's the exponent, except to assume that the largest number
-    // read in is the exponent (to filter out TF lim or P-1 bool)
-    #ifdef EBUG
-    printf("      Branched on default\n");
-    #endif
-    ptr_start = ptr; /* Nothing special, so reset ptr_start to the start */
-    if ('M' == *ptr_start)	// M means Mersenne exponent...
-      ptr_start++;
-    errno = 0;
+#ifdef EBUG
+		printf("      Looping on chars, ptr_start = %c\n", *ptr_start);
+#endif
+
+		if ( ('A' <= *ptr_start && *ptr_start <= 'F') || ('a' <= *ptr_start && *ptr_start <= 'f') ) {
+			// we have some sort of hex assignment key, or "N/A". Either way, it's an AID of some sort.
+
+#ifdef EBUG
+			printf("      Branched on AID, trigger is %c\n", *ptr_start);
+#endif
+			strcopy(assignment->hex_key, ptr, (ptr_end - ptr));
+			assignment->hex_key[ptr_end-ptr] = '\0';	// null-terminate key
+#ifdef EBUG
+			printf("      Key is '%s'\n", assignment->hex_key);
+#endif
+			goto outer_continue;
+		} else if ( *ptr_start == 'k' || *ptr_start == 'K' ) {
+			// we've found a fft length field.
+#ifdef EBUG
+			printf("      Branched on FFT-K\n");
+#endif
+			errno = 0;
+			proposed_fftlen = strtoul(ptr, &ptr2, 10) * 1024; // Don't forget the K ;)
+			if(ptr == ptr2 || ptr2 < ptr_start) // the second condition disallows space between the num and K, so "1444 K" will fail,
+				return INVALID_FORMAT;            // but it also disallows "1rrrK", so I think it's worth it.
+			if(errno != 0 || proposed_fftlen > INT_MAX)
+				return INVALID_DATA;
+			assignment->fft_length = proposed_fftlen;
+			goto outer_continue;
+		} else if( *ptr_start == 'm' || *ptr_start == 'M' ) {
+			// we've found a fft length field.
+#ifdef EBUG
+			printf("      Branched on FFT-M\n");
+#endif
+			errno = 0;
+			proposed_fftlen = strtoul(ptr, &ptr2, 10) * 1024*1024; // Don't forget the M ;)
+			if(ptr == ptr2 || ptr2 < ptr_start) // the second condition disallows space between the num and K, so "1444 M" will fail,
+				return INVALID_FORMAT;            // but it also disallows "1rrrK", so I think it's worth it.
+			if(errno != 0 || proposed_fftlen > INT_MAX)
+				return INVALID_DATA;
+			assignment->fft_length = proposed_fftlen;
+			goto outer_continue;
+
+		} else { // Not special, so we must continue checking the rest of the chars in the field
+			continue;
+		}
+	} // end inner for()
+	
+	// Now we know there's nothing special about this field, so
+	// we must assume it's the exponent, except to assume that the largest number
+	// read in is the exponent (to filter out TF lim or P-1 bool)
+
+#ifdef EBUG
+	printf("      Branched on default\n");
+#endif
+	
+	ptr_start = ptr; /* Nothing special, so reset ptr_start to the start */
+	if ('M' == *ptr_start)	// M means Mersenne exponent...
+		ptr_start++;
+	errno = 0;
     proposed_exponent = strtol(ptr_start, &ptr2, 10);
     if(ptr_start == ptr2)
       return INVALID_FORMAT; // no conversion
@@ -419,30 +446,57 @@ output
     printf("      'Expo' conversion is %ld\n", proposed_exponent);
     #endif
     count_numerical_field++;
-    if (count_numerical_field == 1) {
-      if (proposed_exponent != 1)
-        return INVALID_DATA;
-    }
-    else if (count_numerical_field == 2) {
-      if (proposed_exponent != 2)
-        return INVALID_DATA;
-    }
-    else if (count_numerical_field == 3) {
-      if ( proposed_exponent > (unsigned) assignment->exponent ) assignment->exponent = (int)proposed_exponent;
-      else return INVALID_DATA;
-    }
-    else if (count_numerical_field == 4) {
-      if (proposed_exponent != -1)
-        return INVALID_DATA;
-    }
-    else if (count_numerical_field == 5) {
-      if ( proposed_exponent > 0) assignment->tf_depth = (int)proposed_exponent;
-      else return INVALID_DATA;
-    }
-    else if (count_numerical_field == 6) {
-      if ( proposed_exponent > 0 ) assignment->ll_saved = (int)proposed_exponent;
-      else return INVALID_DATA;
-    }
+	switch (count_numerical_field) {
+		case 1:
+			if (proposed_exponent != 1)
+				return INVALID_DATA;
+			break;
+		case 2:
+			if (proposed_exponent != 2)
+				return INVALID_DATA;
+			break;
+		case 3:
+			if ( proposed_exponent > (unsigned) assignment->exponent )
+				assignment->exponent = (int)proposed_exponent;
+			else
+				return INVALID_DATA;
+			break;
+		case 4:
+			if (proposed_exponent != -1)
+				return INVALID_DATA;
+			break;
+		case 5:
+			if ( proposed_exponent > 0)
+				if (assignment->type == PFACTOR)
+					assignment->tf_depth = (int)proposed_exponent;
+				else if (assignment->type == PMINUS1)
+					assignment->b1 = (int)proposed_exponent;
+				else
+					return INVALID_DATA;
+			else
+				return INVALID_DATA;
+			break;
+		case 6:
+			if ( proposed_exponent > 0 )
+				if (assignment->type == PFACTOR)
+					assignment->ll_saved = (int)proposed_exponent;
+				else if (assignment->type == PMINUS1)
+					assignment->b2 = (int)proposed_exponent;
+				else
+					return INVALID_DATA;
+			else
+				return INVALID_DATA;
+			break;
+		case 7:
+			if ( proposed_exponent > 0 && assignment->type == PMINUS1)
+				assignment->tf_depth = (int)proposed_exponent;
+			else
+				return INVALID_DATA;
+			break;
+		default:
+			return INVALID_DATA;
+	}
+
     outer_continue: /* One nice feature Python has is putting "else"s on loops, only to be executed when NOT "break"-ed from.
                  That's exactly what I'm duplicating here with the inner loop and default "expo" branching. */
     ptr = 1 + ptr_end; // Reset for the next field (*ptr == '\n' || *ptr == comment-delimiter when we're done)
@@ -498,7 +552,7 @@ output
  *     1 - get_next_assignment : cannot open file							    *
  *     2 - get_next_assignment : no valid assignment found						    *
  ************************************************************************************************************/
-enum ASSIGNMENT_ERRORS get_next_assignment(char *filename, int *exponent, int* fft_length, int* tf_depth, int* ll_saved, LINE_BUFFER *key)
+enum ASSIGNMENT_ERRORS get_next_assignment(char *filename, int *exponent, int* fft_length, int* tf_depth, int* ll_saved, LINE_BUFFER *key, int* b1, int* b2)
 {
   struct ASSIGNMENT assignment;
 
@@ -553,15 +607,22 @@ enum ASSIGNMENT_ERRORS get_next_assignment(char *filename, int *exponent, int* f
   while (1);
 
   fclose(f_in);
-  if (NO_WARNING == value)
-  {
-    *exponent = assignment.exponent;
-    if(assignment.fft_length > 0) *fft_length = assignment.fft_length;
-    *tf_depth = assignment.tf_depth;
-    *ll_saved = assignment.ll_saved;
-    #ifdef EBUG
-    printf("Struct fft is %d, *fft_length is %d\n", assignment.fft_length, *fft_length);
-    #endif
+  if (NO_WARNING == value) {
+	  *exponent = assignment.exponent;
+	  if (assignment.fft_length > 0)
+		  *fft_length = assignment.fft_length;
+	  *tf_depth = assignment.tf_depth;
+
+	  if (assignment.type==PFACTOR)
+		  *ll_saved = assignment.ll_saved;
+	  if (assignment.type==PMINUS1) {
+		  *b1 = assignment.b1;
+		  *b2 = assignment.b2;
+	  }
+
+#ifdef EBUG
+	  printf("Struct fft is %d, *fft_length is %d\n", assignment.fft_length, *fft_length);
+#endif
 
     if (key!=NULL)strcopy(*key, assignment.hex_key, MAX_LINE_LENGTH+1);
 
