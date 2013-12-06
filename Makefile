@@ -20,10 +20,10 @@ CFLAGS = -O$(OptLevel) -Wall
 L = -lcufft -lcudart -lm -lgmp
 LDFLAGS = $(CFLAGS) -fPIC -L$(CULIB) $(L)
 
-$(NAME): CUDAPm1.o parse.o
+$(NAME): CUDAPm1.o parse.o rho.o
 	$(CC) $^ $(LDFLAGS) -o $(OUT)
 
-CUDAPm1.o: CUDAPm1.cu parse.h cuda_safecalls.h
+CUDAPm1.o: CUDAPm1.cu parse.h cuda_safecalls.h rho.h
 	$(CUC) $(NVCC_OPTS) $(CUFLAGS) -c $<
 
 %.o: %.c %.h
