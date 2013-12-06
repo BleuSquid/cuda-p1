@@ -587,17 +587,15 @@ __global__ void norm1b (double *g_in,
                          double *g_ttmp,
                          long long int *g_carry,
 		                     volatile float *g_err,
-		                     float maxerr,
-		                     int g_err_flag)
-{
-  long long int bigint[2], shifted_carry;
+						float maxerr, int g_err_flag) {
+	long long int bigint[2], shifted_carry, carry_tmp;
   int  numbits[2] = {g_qn[0],g_qn[0]}, mask[2];
   double ttp_temp;
   const int index = (blockIdx.x * blockDim.x + threadIdx.x) << 1;
   const int index1 = blockIdx.x << 1;
   __shared__ long long int carry[1024 + 1];
 
-  {
+
     double tval[2], trint[2];
     float ferr[2];
 
@@ -605,13 +603,11 @@ __global__ void norm1b (double *g_in,
     ttp_temp = g_ttmp[index + 1];
     trint[0] = g_in[index];
     trint[1] = g_in[index + 1];
-    if(tval[0] < 0.0)
-    {
+	if(tval[0] < 0.0) {
       numbits[0]++;
       tval[0] = -tval[0];
     }
-    if(ttp_temp < 0.0)
-    {
+	if(ttp_temp < 0.0) {
       numbits[1]++;
       ttp_temp = -ttp_temp;
     }
@@ -619,65 +615,68 @@ __global__ void norm1b (double *g_in,
     tval[0] = trint[0] * tval[0];
     tval[1] = trint[1] * tval[1];
     trint[0] = RINT (tval[0]);
-    ferr[0] = tval[0] - trint[0];
-    ferr[0] = fabs (ferr[0]);
+	ferr[0] = fabs(tval[0] - trint[0]);
     bigint[0] = (long long int) trint[0];
     trint[1] = RINT (tval[1]);
-    ferr[1] = tval[1] - trint[1];
-    ferr[1] = fabs (ferr[1]);
+	ferr[1] = fabs(tval[1] - trint[1]);
     bigint[1] = (long long int) trint[1];
     mask[0] = -1 << numbits[0];
     mask[1] = -1 << numbits[1];
-    if(ferr[0] < ferr[1]) ferr[0] = ferr[1];
-    if (ferr[0] > maxerr) atomicMax((int*) g_err, __float_as_int(ferr[0]));
+	ferr[0] = fmax(ferr[0], ferr[1]);
+
+	if (ferr[0] > maxerr) {
+		atomicMax((int*) g_err, __float_as_int(ferr[0]));
   }
   bigint[0] *= 3;
   bigint[1] *= 3;
   carry[threadIdx.x + 1] = (bigint[1] >> numbits[1]);
+	__syncthreads();
+
+	carry_tmp = carry[threadIdx.x];
   bigint[1] = bigint[1] & ~mask[1];
   bigint[1] += bigint[0] >> numbits[0];
   bigint[0] =  bigint[0] & ~mask[0];
-  __syncthreads ();
 
-  if (threadIdx.x) bigint[0] += carry[threadIdx.x];
+	if (threadIdx.x) {
+		bigint[0] += carry_tmp;
+	}
   shifted_carry = bigint[1] - (mask[1] >> 1);
   bigint[1] = bigint[1] - (shifted_carry & mask[1]);
   carry[threadIdx.x] = shifted_carry >> numbits[1];
+	__syncthreads();
+
+	carry_tmp = carry[threadIdx.x + 1] + carry[threadIdx.x];
   shifted_carry = bigint[0] - (mask[0] >> 1);
   bigint[0] = bigint[0] - (shifted_carry & mask[0]);
   bigint[1] += shifted_carry >> numbits[0];
-  __syncthreads ();
 
-  if (threadIdx.x == (blockDim.x - 1))
-  {
-    if (blockIdx.x == gridDim.x - 1) g_carry[0] = carry[threadIdx.x + 1] + carry[threadIdx.x];
-    else   g_carry[blockIdx.x + 1] =  carry[threadIdx.x + 1] + carry[threadIdx.x];
+	if (threadIdx.x == (blockDim.x - 1)) {
+		if (blockIdx.x == gridDim.x - 1) {
+			g_carry[0] = carry_tmp;
+		} else {
+			g_carry[blockIdx.x + 1] = carry_tmp;
+		}
   }
 
-  if (threadIdx.x)
-  {
+	if (threadIdx.x) {
     bigint[0] += carry[threadIdx.x - 1];
-    {
         g_in[index + 1] = (double) bigint[1] * ttp_temp;
         ttp_temp *= -g_ttp_inc[numbits[0] == g_qn[0]];
         g_in[index] = (double) bigint[0] * ttp_temp;
-    }
-    if(g_err_flag)
-    {
+		if (g_err_flag) {
       g_xint[index + 1] = bigint[1];
       g_xint[index] = bigint[0];
     }
-  }
-  else
-  {
+	} else {
     g_data[index1] = bigint[0];
     g_data[index1 + 1] = bigint[1];
   }
 }
 
 
-__global__ void
-norm2a (double *g_x, int *g_xint, int g_N, int threads1, int *g_data, int *g_carry, double *g_ttp1, int g_err_flag)
+__global__ void norm2a (double *g_x,
+int *g_xint,
+int g_N, int threads1, int *g_data, int *g_carry, double *g_ttp1, int g_err_flag)
 {
   const int threadID = blockIdx.x * blockDim.x + threadIdx.x;
   const int threadID1 = threadID << 1;
@@ -686,13 +685,11 @@ norm2a (double *g_x, int *g_xint, int g_N, int threads1, int *g_data, int *g_car
   int mask, shifted_carry, numbits= g_qn[0];
   double temp;
 
-  if (j < g_N)
-    {
+	if (j < g_N) {
       temp0 = g_data[threadID1] + g_carry[threadID];
       temp1 = g_data[threadID1 + 1];
       temp = g_ttp1[threadID];
-      if(temp < 0.0)
-      {
+		if(temp < 0.0) {
         numbits++;
         temp = -temp;
       }
@@ -700,13 +697,10 @@ norm2a (double *g_x, int *g_xint, int g_N, int threads1, int *g_data, int *g_car
       shifted_carry = temp0 - (mask >> 1) ;
       temp0 = temp0 - (shifted_carry & mask);
       temp1 += (shifted_carry >> numbits);
-      {
         g_x[j + 1] = temp1 * temp;
         temp *= -g_ttp_inc[numbits == g_qn[0]];
         g_x[j] = temp0 * temp;
-      }
-      if(g_err_flag)
-      {
+		if (g_err_flag) {
         g_xint[j + 1] = temp1;
         g_xint[j] = temp0;
       }
