@@ -35,6 +35,8 @@ char program[] = "CUDAPm1 v0.20";
 #include "parse.h"
 #include "rho.h"
 
+#include "complex_math.cu"
+
 /* In order to have the gettimeofday() function, you need these includes on Linux:
 #include <sys/time.h>
 #include <unistd.h>
@@ -96,61 +98,68 @@ void set_qn(int *h_qn){
     cudaMemcpyToSymbol(g_qn, h_qn, 2 * sizeof(int));
 }
 
-__global__ void square (int n,
-                         double *a,
-                         double *ct)
-{
+__global__ void square (int n, double *a, double *ct) {
   const int j2 = blockIdx.x * blockDim.x + threadIdx.x;
-  double wkr, wki, xr, xi, yr, yi, ajr, aji, akr, aki;
-  //double new_ajr, new_aji, new_akr, new_aki;
+	double wk[2], x[2], y[2], aj[2], ak[2];
   const int m = n >> 1;
   const int nc = n >> 2;
   const int j = j2 << 1;
 
-  if (j2)
-    {
-      int nminusj = n - j;
-      wkr = 0.5 - ct[nc - j2];
-      wki = ct[j2];
-      ajr = a[j];
-      aji = a[1 + j];
-      akr = a[nminusj];
-      aki = a[1 + nminusj];
-      xr = ajr - akr;
-      xi = aji + aki;
-      yr = wkr * xr - wki * xi;
-      yi = wkr * xi + wki * xr;
-      ajr -= yr;
-      aji -= yi;
-      akr += yr;
-      aki -= yi;
+	int index[2];
 
-      xi = 2.0 * ajr * aji;
-      xr = (ajr - aji) * (ajr + aji);
-      yi = 2.0 * akr * aki;
-      yr = (akr - aki) * (akr + aki);
+	if (j2) {
+		index[0] = j;
+		index[1] = n - j;
 
-      ajr = xr - yr;
-      aji = xi + yi;
-      akr = wkr * ajr + wki * aji;
-      aki = wkr * aji - wki * ajr;
+		wk[0] = 0.5 - ct[nc - j2];
+		wk[1] = ct[j2];
+		aj[0] = a[index[0]];
+		aj[1] = a[index[0] + 1];
+		ak[0] = a[index[1]];
+		ak[1] = a[index[1] + 1];
 
-      a[j] = xr - akr;
-      a[1 + j] = aki - xi;
-      a[nminusj] = yr + akr;
-      a[1 + nminusj] =  aki - yi;
+		x[0] = aj[0] - ak[0];
+		x[1] = aj[1] + ak[1];
+
+		complex_mult(wk, x, y);
+
+		aj[0] -= y[0];
+		aj[1] -= y[1];
+		ak[0] += y[0];
+		ak[1] -= y[1];
+
+		complex_square(aj, x);
+		complex_square(ak, y);
+
+		aj[0] = x[0] - y[0];
+		aj[1] = x[1] + y[1];
+		ak[0] = wk[0] * aj[0] + wk[1] * aj[1];
+		ak[1] = wk[0] * aj[1] - wk[1] * aj[0];
+
+		aj[0] = x[0] - ak[0];
+		aj[1] = ak[1] - x[1];
+		ak[0] = y[0] + ak[0];
+		ak[1] = ak[1] - y[1];
+
+	} else {
+
+		index[0] = 0;
+		index[1] = m;
+
+		x[0] = a[index[0]];
+		x[1] = a[index[0] + 1];
+
+		aj[0] = x[0] * x[0] + x[1] * x[1];
+		aj[1] = -2 * x[0] * x[1];
+
+		y[0] =  a[index[1]];
+		y[1] = -a[index[1] + 1];
+		complex_square(y, ak);
     }
-  else
-    {
-      xr = a[0];
-      xi = a[1];
-      a[0] = xr * xr + xi * xi;
-      a[1] = -xr * xi - xi * xr;
-      xr = a[0 + m];
-      xi = a[1 + m];
-      a[1 + m] = -xr * xi - xi * xr;
-      a[0 + m] = xr * xr - xi * xi;
-    }
+	a[index[0]]     = aj[0];
+	a[index[0] + 1] = aj[1];
+	a[index[1]]     = ak[0];
+	a[index[1] + 1] = ak[1];
 }
 
 __global__ void square1 (int n,

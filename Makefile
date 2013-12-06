@@ -61,7 +61,7 @@ $(BIN): $(OBJS)
 $(DEBUG_BIN): $(OBJS)
 	$(CXX) $^ $(DEBUG_CFLAGS) $(LDFLAGS) $(LIBS) -o $@
 
-CUDAPm1.o: CUDAPm1.cu parse.h cuda_safecalls.h rho.h
+CUDAPm1.o: CUDAPm1.cu parse.h cuda_safecalls.h rho.h complex_math.cu
 	$(NVCC) $(NVCC_CFLAGS) -c $<
 
 %.o: %.c %.h
