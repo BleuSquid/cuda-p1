@@ -2946,6 +2946,7 @@ int stage2_init_param1(int k, int base, int e, int n, int trans, float *err)
     for(j = 1; j < e; j++)
       cufftSafeCall (cufftExecZ2Z (plan, (cufftDoubleComplex *) &e_data[j * n], (cufftDoubleComplex *) &e_data[j * n], CUFFT_INVERSE));
     trans += e + 1;
+	free(exponents);
   }
   return trans;
 }
@@ -3037,6 +3038,7 @@ int rp_init_count1(int k, int base, int e, int n)
 	      trans += (int) mpz_sizeinbase (exponents[j], 2) + (int) mpz_popcount(exponents[j]) - 2;
     }
     for(j = 0; j <= e; j++) mpz_clear(exponents[j]);
+	free(exponents);
     return 2 * (trans + e + 2) - 1;
   }
 }
