@@ -1311,7 +1311,7 @@ makect (int nc, double *c)
   int j;
   double d = (double) (nc << 1);
 
-  for (j = 1; j <= nc; j++) c[j] = 0.5 * cospi (j / d);
+  for (j = 0; j < nc; j++) c[j] = 0.5 * cospi (j / d);
 }
 
 void alloc_gpu_mem(int n)
