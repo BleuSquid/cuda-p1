@@ -72,7 +72,7 @@ CUDAPm1.o: CUDAPm1.cu parse.h cuda_safecalls.h rho.h complex_math.cu CUDAPm1.h
 
 clean: clean-test
 	rm -f *.o *~
-	rm -f $(NAME) debug_$(NAME) test_$(NAME)
+	rm -f $(BIN) $(DEBUG_BIN)
 
 debug: $(DEBUG_BIN)
 
