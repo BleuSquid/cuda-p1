@@ -3468,7 +3468,7 @@ int stage2(int *x_int, unsigned *x_packed, int q, int n, int nrp, float err)
         {
           E_sub_mul(g_x, g_x, &e_data[0], &rp_data[j * n], n, err, t == t_last);
           num_tran += 2;
-          if(num_tran % 200 == 0)
+          if(num_tran % 200 == 0 || t_f)
           {
             cutilSafeCall (cudaMemcpy (&err, g_err, sizeof (float), cudaMemcpyDeviceToHost));
             if(err > 0.4) quitting = 2;
@@ -3482,7 +3482,7 @@ int stage2(int *x_int, unsigned *x_packed, int q, int n, int nrp, float err)
 	    if(!quitting)
 	    {
 	      if(k < ke - 1) num_tran = next_base1(k, e, n, num_tran, &err);
-        if(num_tran % 200 < 2 * e)
+        if(num_tran % 200 < 2 * e || t_f)
         {
           cutilSafeCall (cudaMemcpy (&err, g_err, sizeof (float), cudaMemcpyDeviceToHost));
           if(err > 0.4) quitting = 2;
@@ -3677,7 +3677,7 @@ check_pm1 (int q, char *expectedResidue)
 
    for (; !restarting && j <= last; j++) // Main LL loop
     {
-	    if ((j % 100) == 0) error_flag = 1;
+	    if ((j % 100) == 0 || t_f) error_flag = 1;
 	    else error_flag = 0;
       if ((j % checkpoint_iter == 0) || j == last) checkpoint_flag = 1;
       else checkpoint_flag = error_flag;
