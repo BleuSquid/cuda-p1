@@ -15,36 +15,36 @@ void rho_init() {
 	
 	long double half[D];
 	long double integ[D];
-
+	
 	half[0] = 0.5;
-
-	for (j = 1;j < D; ++j)
+	
+	for (j = 1; j < D; ++j)
 		half[j] = half[j - 1] * 0.5;
 	
-	for (j = 0;j < D; ++j)
-		integ[j] = half[j] / (long double)(j + 1.0);
+	for (j = 0; j < D; ++j)
+		integ[j] = half[j] / (long double) (j + 1.0);
 	
 	rho_pre[0][0] = 1;
 	rho_pre[1][0] = 1;
-
-	for (j = 1;j < D; ++j) {
+	
+	for (j = 1; j < D; ++j) {
 		rho_pre[0][j] = 0;
 		rho_pre[1][j] = 0;
 	}
 	
-	for (i = 2;i < C; ++i) {
+	for (i = 2; i < C; ++i) {
 		minus1overu = -2.0 / (long double) i;
 		
 		r = 0.0;
-		for (j = 0;j < D; ++j)
+		for (j = 0; j < D; ++j)
 			r += rho_pre[i - 2][j] * integ[j] + rho_pre[i - 1][j] * integ[j];
-
+		
 		r *= -minus1overu;
-
+		
 		rho_pre[i][0] = r;
 		rho_pre[i][1] = minus1overu * rho_pre[i - 2][0];
-
-		for (j = 2;j < D;++j) {
+		
+		for (j = 2; j < D; ++j) {
 			rho_pre[i][j] = (minus1overu / (long double) j) * (rho_pre[i - 2][j - 1] + rho_pre[i][j - 1] * ((long double) j - 1.0));
 		}
 	}
@@ -71,25 +71,10 @@ inline double rho(double u) {
 		return 0;
 	
 	eps = u2 - (long double) i / 2.0;
-
+	
 	result = 0.0;
-	for (j = D - 1;j >= 0;--j)
+	for (j = D - 1; j >= 0; --j)
 		result = result * eps + rho_pre[i][j];
-
+	
 	return result;
 }
-/*
-int main(int argc,char **argv) {
-	double u;
-	long double rhou;
-
-	rho_init();
-	
-	while (scanf("%lf",&u) == 1) {
-		rhou = rho(u);
-		
-		printf("%10.10Lg\n",rhou);
-	}
-	
-	exit(0);
-}*/
