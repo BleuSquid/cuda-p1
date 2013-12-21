@@ -3214,7 +3214,7 @@ int stage2(int *x_int, unsigned *x_packed, int q, int n, int nrp, float err) {
 				} else if (polite_f && num_tran % (2 * polite) < 2 * e)
 					cutilSafeThreadSync();
 			}
-			if (k == next_checkpoint || quitting == 1) {
+			if ((k == next_checkpoint || quitting == 1) && quitting != 2) {
 				checkpoint_bnd += checkpoint_int;
 				next_checkpoint = RINT_x86(checkpoint_bnd);
 				next_checkpoint |= 1;
