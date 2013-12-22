@@ -101,7 +101,7 @@ void set_qn(int *h_qn) {
 
 __global__ void square(int n, double *a, double *ct) {
 	const int j2 = blockIdx.x * blockDim.x + threadIdx.x;
-	double wk[2], x[2], y[2], aj[2], ak[2];
+	cuDoubleComplex wk, x, y, aj, ak;
 	const int m = n >> 1;
 	const int nc = n >> 2;
 	const int j = j2 << 1;
@@ -112,55 +112,55 @@ __global__ void square(int n, double *a, double *ct) {
 		index[0] = j;
 		index[1] = n - j;
 		
-		wk[0] = 0.5 - ct[nc - j2];
-		wk[1] = ct[j2];
-		aj[0] = a[index[0]];
-		aj[1] = a[index[0] + 1];
-		ak[0] = a[index[1]];
-		ak[1] = a[index[1] + 1];
+		wk.x = 0.5 - ct[nc - j2];
+		wk.y = ct[j2];
+		aj.x = a[index[0]];
+		aj.y = a[index[0] + 1];
+		ak.x = a[index[1]];
+		ak.y = a[index[1] + 1];
 		
-		x[0] = aj[0] - ak[0];
-		x[1] = aj[1] + ak[1];
+		x.x = aj.x - ak.x;
+		x.y = aj.y + ak.y;
 		
-		complex_mult(wk, x, y);
+		y = cuCmul(wk,x);
 		
-		aj[0] -= y[0];
-		aj[1] -= y[1];
-		ak[0] += y[0];
-		ak[1] -= y[1];
+		aj.x -= y.x;
+		aj.y -= y.y;
+		ak.x += y.x;
+		ak.y -= y.y;
 		
-		complex_square(aj, x);
-		complex_square(ak, y);
+		x = cuCsqr(aj);
+		y = cuCsqr(ak);
 		
-		aj[0] = x[0] - y[0];
-		aj[1] = x[1] + y[1];
-		ak[0] = wk[0] * aj[0] + wk[1] * aj[1];
-		ak[1] = wk[0] * aj[1] - wk[1] * aj[0];
+		aj.x = x.x - y.x;
+		aj.y = x.y + y.y;
+		ak.x = wk.x * aj.x + wk.y * aj.y;
+		ak.y = wk.x * aj.y - wk.y * aj.x;
 		
-		aj[0] = x[0] - ak[0];
-		aj[1] = ak[1] - x[1];
-		ak[0] = y[0] + ak[0];
-		ak[1] = ak[1] - y[1];
+		aj.x = x.x - ak.x;
+		aj.y = ak.y - x.y;
+		ak.x = y.x + ak.x;
+		ak.y = ak.y - y.y;
 		
 	} else {
 		
 		index[0] = 0;
 		index[1] = m;
 		
-		x[0] = a[index[0]];
-		x[1] = a[index[0] + 1];
+		x.x = a[index[0]];
+		x.y = a[index[0] + 1];
 		
-		aj[0] = x[0] * x[0] + x[1] * x[1];
-		aj[1] = -2 * x[0] * x[1];
+		aj.x = x.x * x.x + x.y * x.y;
+		aj.y = -2 * x.x * x.y;
 		
-		y[0] = a[index[1]];
-		y[1] = -a[index[1] + 1];
-		complex_square(y, ak);
+		y.x = a[index[1]];
+		y.y = -a[index[1] + 1];
+		ak = cuCsqr(y);
 	}
-	a[index[0]] = aj[0];
-	a[index[0] + 1] = aj[1];
-	a[index[1]] = ak[0];
-	a[index[1] + 1] = ak[1];
+	a[index[0]] = aj.x;
+	a[index[0] + 1] = aj.y;
+	a[index[1]] = ak.x;
+	a[index[1] + 1] = ak.y;
 }
 
 __global__ void square1(int n, double *b, double *a, double *ct) {
