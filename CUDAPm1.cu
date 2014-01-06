@@ -2403,7 +2403,7 @@ int vals, int *bound1, int *bound2, double *success_rate) {
 	/* NOTE: In version 22, the GCD speed has approximately doubled.  I've */
 	/* adjusted the formula accordingly. */
 
-	gcd_cost = (430.5 * log((double) guess_exp) - 3887.5) / 2.0;
+	gcd_cost = (107.6 * log((double) guess_exp) - 1943.7) / 2.0;
 	if (gcd_cost < 50.0)
 		gcd_cost = 50.0;
 	
@@ -2541,8 +2541,8 @@ int vals, int *bound1, int *bound2, double *success_rate) {
 		/* Is this the best B1 thusfar? */
 
 		if (guess_B1 == 10000
-				|| best[0].prob * ll_tests * guess_exp - (pass1_squarings + best[0].pass2_squarings)
-						> best[1].prob * ll_tests * guess_exp - (best[1].pass1_squarings + best[1].pass2_squarings)) {
+				|| 1.15 * best[0].prob * ll_tests * guess_exp - (pass1_squarings + best[0].pass2_squarings)
+						> 1.15 * best[1].prob * ll_tests * guess_exp - (best[1].pass1_squarings + best[1].pass2_squarings)) {
 			best[1].B1 = guess_B1;
 			best[1].B2 = best[0].B2;
 			best[1].prob = best[0].prob;
@@ -2550,15 +2550,15 @@ int vals, int *bound1, int *bound2, double *success_rate) {
 			best[1].pass2_squarings = best[0].pass2_squarings;
 			continue;
 		}
-		if (best[0].prob * ll_tests * guess_exp - (pass1_squarings + best[0].pass2_squarings)
-				< 0.9 * (best[1].prob * ll_tests * guess_exp - (best[1].pass1_squarings + best[1].pass2_squarings)))
+		if (1.15 * best[0].prob * ll_tests * guess_exp - (pass1_squarings + best[0].pass2_squarings)
+				< 0.9 * (1.15 * best[1].prob * ll_tests * guess_exp - (best[1].pass1_squarings + best[1].pass2_squarings)))
 			break;
 		continue;
 	}
 	
 	/* Return the final best choice */
 
-	if (best[1].prob * ll_tests * guess_exp > best[1].pass1_squarings + best[1].pass2_squarings + gcd_cost) {
+	if (1.15 * best[1].prob * ll_tests * guess_exp > best[1].pass1_squarings + best[1].pass2_squarings + gcd_cost) {
 		*bound1 = best[1].B1;
 		*bound2 = best[1].B2;
 // *squarings = (unsigned long)
