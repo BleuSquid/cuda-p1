@@ -20,15 +20,19 @@ DEBUG_CFLAGS = -g -O0 $(COMMON_INCLUDES) $(COMMON_DEFINES)
 # or leave all uncommented for a generic binary
 # sm_21 is actually slower than sm_20 on sm_21 hardware...
 
-#NVCC_ARCHES += -gencode arch=compute_13,code=sm_13
+NVCC_ARCHES += -gencode arch=compute_13,code=sm_13
 NVCC_ARCHES += -gencode arch=compute_20,code=sm_20
-#NVCC_ARCHES += -gencode arch=compute_20,code=sm_21
+NVCC_ARCHES += -gencode arch=compute_20,code=sm_21
 NVCC_ARCHES += -gencode arch=compute_30,code=sm_30
-#NVCC_ARCHES += -gencode arch=compute_35,code=sm_35
+NVCC_ARCHES += -gencode arch=compute_35,code=sm_35
+NVCC_ARCHES += -gencode arch=compute_50,code=sm_50
+# *Always* include PTX for the highest level supported by this version of NVCC, to
+# future-proof the binary for new architectures
+NVCC_ARCHES += -gencode arch=compute_50,code=compute_50
 
 # Use --ptxas-options -v to see register usage
 # Use --maxrregcount to specify register usage
-NVCC_CFLAGS = $(OPTLEVEL) $(COMMON_INCLUDES) $(COMMON_DEFINES) $(NVCC_ARCHES) --compiler-options="$(CFLAGS) -fno-strict-aliasing" -use_fast_math --ptxas-options="-dlcm=cg"
+NVCC_CFLAGS = $(OPTLEVEL) $(COMMON_INCLUDES) $(COMMON_DEFINES) $(NVCC_ARCHES) --compiler-options="$(CFLAGS) -fno-strict-aliasing" -use_fast_math --ptxas-options="-dlcm=cg" --maxrregcount=31
 NVCC_DEBUG_CFLAGS = -g -O0 $(COMMON_INCLUDES) $(COMMON_DEFINES) $(NVCC_ARCHES) --compiler-options="$(CFLAGS) -fno-strict-aliasing" -use_fast_math --ptxas-options="-v -dlcm=cg"
 
 #CULIB = $(CUDA)/lib/x86-64-linux-gnu
