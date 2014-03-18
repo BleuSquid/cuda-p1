@@ -2367,7 +2367,7 @@ int vals, int *bound1, int *bound2, double *success_rate) {
 	int guess_B1, guess_B2, /*vals,*/i;
 	double h, pass1_squarings, pass2_squarings;
 	double logB1, logB2, kk, logkk, temp, logtemp, log2;
-	double prob, gcd_cost, ll_tests, numprimes;
+	double prob, ll_tests, numprimes;
 	struct {
 			int B1;
 			int B2;
@@ -2396,17 +2396,7 @@ int vals, int *bound1, int *bound2, double *success_rate) {
 	/* corrupt result reported some of the time). */
 
 	ll_tests = (double) tests_saved + 2 * 0.018;
-	
-	/* Precompute the cost of a GCD.  We used Excel to come up with the */
-	/* formula GCD is equivalent to 861 * Ln (p) - 7775 transforms. */
-	/* Since one squaring equals two transforms we get the formula below. */
-	/* NOTE: In version 22, the GCD speed has approximately doubled.  I've */
-	/* adjusted the formula accordingly. */
 
-	gcd_cost = (107.6 * log((double) guess_exp) - 1943.7) / 2.0;
-	if (gcd_cost < 50.0)
-		gcd_cost = 50.0;
-	
 	/* Compute how many temporaries we can use given our memory constraints. */
 	/* Allow 1MB for code and data structures. */
 
@@ -2558,12 +2548,12 @@ int vals, int *bound1, int *bound2, double *success_rate) {
 	
 	/* Return the final best choice */
 
-	if (1.15 * best[1].prob * ll_tests * guess_exp > best[1].pass1_squarings + best[1].pass2_squarings + gcd_cost) {
+	if (1.15 * best[1].prob * ll_tests * guess_exp > best[1].pass1_squarings + best[1].pass2_squarings) {
 		*bound1 = best[1].B1;
 		*bound2 = best[1].B2;
 // *squarings = (unsigned long)
 //	(best[1].pass1_squarings +
-//	 best[1].pass2_squarings + gcd_cost);
+//	 best[1].pass2_squarings);
 		*success_rate = best[1].prob;
 	} else {
 		*bound1 = 0;
