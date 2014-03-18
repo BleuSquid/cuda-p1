@@ -1957,11 +1957,11 @@ void threadbench(int n, int passes, int device_number) {
 	cutilSafeCall(cudaEventCreateWithFlags(&stop, cudaEventBlockingSync));
 	cufftSafeCall(cufftPlan1d(&plan, n / 2, CUFFT_Z2Z, 1));
 	
-	for (t1 = 0; t1 < 6; t1++) {
+	for (t1 = 2; t1 < 5; t1++) {
 		if (n / (2 * threads[t1]) <= dev.maxGridSize[0] && n % (2 * threads[t1]) == 0) {
-			for (t2 = 0; t2 < 6; t2++) {
+			for (t2 = 0; t2 < 3; t2++) {
 				if (n / (4 * threads[t2]) <= dev.maxGridSize[0] && n % (4 * threads[t2]) == 0) {
-					for (t3 = 0; t3 < 6; t3++) {
+					for (t3 = 0; t3 < 5; t3++) {
 						for (pass = 1; pass <= passes; pass++) {
 							cutilSafeCall(cudaEventRecord(start, 0));
 							for (i = 0; i < 50; i++) {
