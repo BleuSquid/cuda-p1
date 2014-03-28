@@ -3862,6 +3862,17 @@ void parse_args(int argc, char *argv[], int* q, int* device_number, int* cufftbe
 				*q |= 1;
 				while (!isprime(*q))
 					*q += 2;
+
+				// If q specified on cmd line, we aren't given tfdepth or llsaved.
+				// Estimate based on P95 defaults
+				tfdepth = ceil(log(*q) * 3.95);
+				printf("Assuming exponent is trial factored to %d bits\n", tfdepth);
+				
+				// We know all exponents below this have been LL'd at least once.
+				// 2014-03-25
+				if ((*q) <= 50000000)
+					llsaved = 1;
+
 			}
 			argv++;
 			argc--;
