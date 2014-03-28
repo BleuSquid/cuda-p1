@@ -2909,11 +2909,11 @@ int stage2(int *x_int, unsigned *x_packed, int q, int n, int nrp, float err) {
 				double numpairings = numprimes / 2.0 * numprimes / ((double) ((ke - ks) * d) * (double) rpt / d);
 				guess += e * (ke - ks) * passes + (2.2) * (int) (numprimes - numpairings);
 				if (e == 4)
-					guess = (int) guess * 0.95;
+					guess = (int) guess * 0.87;
 				if (e == 6)
-					guess = (int) guess * 0.90;
+					guess = (int) guess * 0.82;
 				if (e == 12)
-					guess = (int) guess * 0.85;
+					guess = (int) guess * 0.75;
 				if (guess < best_guess) {
 					best_guess = guess;
 					best_d = d;
