@@ -982,8 +982,8 @@ int gtpr(int n, uint8* bprimes) {
 	
 	SegSieve<<<grid, threadsPerBlock, 0>>>(device_primes, np, primes_per_thread, n, results);
 	
-	cudaThreadSynchronize();
-	cudaMemcpy(bprimes, results, sizeof(uint8) * (n >> 1), cudaMemcpyDeviceToHost);
+	cutilSafeCall(cudaThreadSynchronize());
+	cutilSafeCall(cudaMemcpy(bprimes, results, sizeof(uint8) * (n >> 1), cudaMemcpyDeviceToHost));
 	cudaFree(device_primes);
 	cudaFree(results);
 	free(primes);
@@ -2986,6 +2986,10 @@ int stage2(int *x_int, unsigned *x_packed, int q, int n, int nrp, float err) {
 	for (j = 0; j < ke; j++)
 		bprimes[j] = 0;
 	gtpr(2 * ke, bprimes);
+	
+	// Make sure previous function is finished before using the results...
+	cutilSafeCall(cudaDeviceSynchronize());
+
 	for (j = 0; j < 10; j++)
 		bprimes[j] = 1;
 	bprimes[0] = bprimes[4] = bprimes[7] = 0;
