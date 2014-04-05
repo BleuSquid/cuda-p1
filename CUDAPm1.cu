@@ -2993,9 +2993,19 @@ int stage2(int *x_int, unsigned *x_packed, int q, int n, int nrp, float err) {
 	for (j = 0; j < 10; j++)
 		bprimes[j] = 1;
 	bprimes[0] = bprimes[4] = bprimes[7] = 0;
-	
-	cutilSafeCall(cudaMalloc((void **) &e_data, sizeof(double) * n * (e + 1)));
+
+#ifdef EBUG
+	size_t global_mem, free_mem;
+	cudaMemGetInfo(&free_mem, &global_mem);
+	printf("Total: %zuM\tFree: %zuM\n", global_mem / 1024 / 1024, free_mem / 1024 / 1024);
+
+	printf("rp_data: Attempting to cudaMalloc %d MB\n", sizeof(double) * n * nrp / 1024 / 1024);
+#endif
 	cutilSafeCall(cudaMalloc((void **) &rp_data, sizeof(double) * n * nrp));
+#ifdef EBUG
+	printf("e_data: Attempting to cudaMalloc %d MB\n", sizeof(double) * n * (e + 1) /1024 / 1024);
+#endif
+	cutilSafeCall(cudaMalloc((void **) &e_data, sizeof(double) * n * (e + 1)));
 	
 	for (j = (b1 + 1) >> 1; j < ks; j++) {
 		if (bprimes[j] == 1) {
