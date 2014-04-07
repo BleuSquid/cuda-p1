@@ -2501,7 +2501,7 @@ int vals, int *bound1, int *bound2, double *success_rate) {
 					
 					/* Add this data in to the total chance of finding a factor */
 
-					prob += prob2 / (h + 0.5);
+					prob += prob2 / (h + 1);
 				}
 				
 				/* Move to next bit level */
