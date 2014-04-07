@@ -2556,8 +2556,8 @@ int vals, int *bound1, int *bound2, double *success_rate) {
 //	 best[1].pass2_squarings);
 		*success_rate = best[1].prob;
 	} else {
-		*bound1 = 0;
-		*bound2 = 0;
+		*bound1 = 10000;
+		*bound2 = 250000;
 // *squarings = 0;
 		*success_rate = 0.0;
 	}
