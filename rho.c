@@ -56,14 +56,15 @@ inline double rho(double u) {
 	long double eps;
 	long double result;
 	long double u2 = 1.0 / (long double) u;
+	float u2f = (float) u2;
 	
-	if (u2 > 1000.0)
+	if (u2f > 1000.0f)
 		return 0;
 	
-	if (u2 < 0)
+	if (u2f < 0.0f)
 		return 1;
 	
-	i = (int) floor(2.0 * u2);
+	i = (int) floor(2.0f * u2f);
 	
 	if (i >= C)
 		return 0;
