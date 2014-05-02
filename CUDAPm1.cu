@@ -3171,7 +3171,7 @@ int stage2(int *x_int, unsigned *x_packed, int q, int n, int nrp, float err) {
 		num_tran = 0;
 		tran_save = 0;
 		
-		checkpoint_int = (ke - ks) / 2 * e + count1 * nrp / (double) rpt;
+		checkpoint_int = (ke - ks) / 2 * e + nrp * ((long int) count1 / rpt);
 		int chkp_per_pass;
 		chkp_per_pass = RINT_x86(checkpoint_int / checkpoint_iter);
 		if (chkp_per_pass == 0)
