@@ -50,7 +50,7 @@ void rho_init() {
 	}
 }
 
-inline double rho(double u) {
+double rho(double u) {
 	int i;
 	int j;
 	long double eps;

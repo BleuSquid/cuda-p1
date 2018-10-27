@@ -16,19 +16,16 @@ NVCC = nvcc
 CFLAGS = $(OPTLEVEL) $(COMMON_INCLUDES) $(COMMON_DEFINES) -Wall
 DEBUG_CFLAGS = -g -O0 $(COMMON_INCLUDES) $(COMMON_DEFINES)
 
-# Uncomment the relevant line for your hardware,
-# or leave all uncommented for a generic binary
-# sm_21 is actually slower than sm_20 on sm_21 hardware...
+# Configure this line to specify which cuda architectures (compute capability) to target
+# or leave all supported architectures for a bulky binary that supports all
+CUDA_ARCHES = 30 32 35 50 52 53 60 61 62 70
 
-NVCC_ARCHES += -gencode arch=compute_13,code=sm_13
-NVCC_ARCHES += -gencode arch=compute_20,code=sm_20
-NVCC_ARCHES += -gencode arch=compute_20,code=sm_21
-NVCC_ARCHES += -gencode arch=compute_30,code=sm_30
-NVCC_ARCHES += -gencode arch=compute_35,code=sm_35
-NVCC_ARCHES += -gencode arch=compute_50,code=sm_50
+# Expand CUDA_ARCHES
+NVCC_ARCHES += $(foreach CARCH, $(CUDA_ARCHES), -gencode arch=compute_$(CARCH),code=sm_$(CARCH))
+
 # *Always* include PTX for the highest level supported by this version of NVCC, to
 # future-proof the binary for new architectures
-NVCC_ARCHES += -gencode arch=compute_50,code=compute_50
+NVCC_ARCHES += -gencode arch=compute_70,code=compute_70
 
 # Use --ptxas-options -v to see register usage
 # Use --maxrregcount to specify register usage
