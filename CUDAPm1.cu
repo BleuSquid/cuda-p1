@@ -1444,7 +1444,9 @@ int choose_fft_length(int q, int *index) {
 		for (i = 0; i < fft_count; i++) {
 			if (multipliers[i] >= estimate) {
 				*index = i;
+#ifdef EBUG
 				printf("Index %d\n", *index);
+#endif
 				return multipliers[i] * 1024;
 			}
 		}
@@ -3362,7 +3364,7 @@ int check_pm1(int q, char *expectedResidue) {
 			nrp = ((free_mem - (size_t) unused_mem * 1024 * 1024) / n / 8 - 7);
 #ifdef _MSC_VER
 		if (nrp > (4096/sizeof(double))*1024*1024/n)
-		nrp = (4096/sizeof(double))*1024*1024/n;  // Max single allocation of 4 GB on Windows?
+			nrp = (4096/sizeof(double))*1024*1024/n;  // Max single allocation of 4 GB on Windows?
 #endif
 		if (nrp < 4)
 			nrp = 4;
