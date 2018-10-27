@@ -1,5 +1,5 @@
 NAME = CUDAPm1
-VERSION = 0.20 Alpha
+VERSION = 0.21
 
 BIN = $(NAME)
 DEBUG_BIN = $(NAME)_debug

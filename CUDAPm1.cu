@@ -1,4 +1,4 @@
-char program[] = "CUDAPm1 v0.20";
+char program[] = "CUDAPm1 v0.21";
 /* CUDALucas.c
  Shoichiro Yamada Oct. 2010
 
