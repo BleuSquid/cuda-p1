@@ -446,30 +446,40 @@ enum PARSE_WARNINGS parse_worktodo_line(FILE *f_in, struct ASSIGNMENT *assignmen
 		proposed_exponent = strtol(ptr_start, &ptr2, 10);
 		if (ptr_start == ptr2)
 			return INVALID_FORMAT;  // no conversion
-		if (errno != 0 || proposed_exponent > INT_MAX)
+		if (errno != 0 || proposed_exponent > INT_MAX) {
+			printf("Exponent too large \n");
 			return INVALID_DATA;
+		}
 #ifdef EBUG
 		printf("      'Expo' conversion is %ld\n", proposed_exponent);
 #endif
 		count_numerical_field++;
 		switch (count_numerical_field) {
 			case 1:
-				if (proposed_exponent != 1)
+				if (proposed_exponent != 1) {
+					printf("First value should be 1\n");
 					return INVALID_DATA;
+				}
 				break;
 			case 2:
-				if (proposed_exponent != 2)
+				if (proposed_exponent != 2) {
+					printf("Second value should be 2\n");
 					return INVALID_DATA;
+				}
 				break;
 			case 3:
 				if (proposed_exponent > (unsigned) assignment->exponent)
 					assignment->exponent = (int) proposed_exponent;
-				else
+				else {
+					printf("Invalid Exponent\n");
 					return INVALID_DATA;
+				}
 				break;
 			case 4:
-				if (proposed_exponent != -1)
+				if (proposed_exponent != -1) {
+					printf("Should be -1\n");
 					return INVALID_DATA;
+				}
 				break;
 			case 5:
 				if (proposed_exponent > 0)
@@ -477,10 +487,12 @@ enum PARSE_WARNINGS parse_worktodo_line(FILE *f_in, struct ASSIGNMENT *assignmen
 						assignment->tf_depth = (int) proposed_exponent;
 					else if (assignment->type == PMINUS1)
 						assignment->b1 = (int) proposed_exponent;
-					else
+					else {
 						return INVALID_DATA;
-				else
+					}
+				else {
 					return INVALID_DATA;
+				}
 				break;
 			case 6:
 				if (proposed_exponent > 0)
@@ -488,16 +500,19 @@ enum PARSE_WARNINGS parse_worktodo_line(FILE *f_in, struct ASSIGNMENT *assignmen
 						assignment->ll_saved = (int) proposed_exponent;
 					else if (assignment->type == PMINUS1)
 						assignment->b2 = (int) proposed_exponent;
-					else
+					else {
 						return INVALID_DATA;
-				else
+					}
+				else {
 					return INVALID_DATA;
+				}
 				break;
 			case 7:
 				if (proposed_exponent > 0 && assignment->type == PMINUS1)
 					assignment->tf_depth = (int) proposed_exponent;
-				else
+				else {
 					return INVALID_DATA;
+				}
 				break;
 			default:
 				return INVALID_DATA;
