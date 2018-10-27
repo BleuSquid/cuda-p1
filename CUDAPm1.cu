@@ -13,6 +13,7 @@ char program[] = "CUDAPm1 v0.20";
 /* Include Files */
 #include <stdlib.h>
 #include <stdio.h>
+#include <ctype.h>
 #include <gmp.h>
 #include <math.h>
 #include <assert.h>
@@ -1298,15 +1299,31 @@ void close_lucas(int *x_int) {
  *       End LL/GPU Functions, Begin Utility/CPU Functions                *
  *                                                                        *
  **************************************************************************/
+
+void remove_spaces (char* str_trimmed, const char* str_untrimmed) {
+	while (*str_untrimmed != '\0') {
+		if(!isspace(*str_untrimmed)) {
+			*str_trimmed = *str_untrimmed;
+			str_trimmed++;
+		}
+		str_untrimmed++;
+	}
+	*str_trimmed = '\0';
+}
+
+
 void init_threads(int n) {
 	FILE *threads;
 	char buf[132];
-	char threadfile[32];
+	char threadfile[256];
 	int no_file = 0, no_entry = 1;
 	int th1 = 0, th2 = 0, th3 = 0;
 	int temp_n;
 	
-	sprintf(threadfile, "%s threads.txt", dev.name);
+	char devname[256];
+	remove_spaces(devname, dev.name);
+
+	sprintf(threadfile, "%s_threads.txt", devname);
 	threads = fopen(threadfile, "r");
 	if (threads) {
 		while (fgets(buf, 132, threads) != NULL) {
@@ -1355,9 +1372,11 @@ int init_ffts() {
 		43904, 47628, 49000, 50000, 50176, 51200, 52488, 54432, 55296, 56000, 57344,
 		60750, 62500, 64000, 64800, 65536};
 	
-	char fftfile[32];
-	
-	sprintf(fftfile, "%s fft.txt", dev.name);
+	char fftfile[256];
+	char devname[256];
+	remove_spaces(devname, dev.name);
+
+	sprintf(fftfile, "%s_fft.txt", devname);
 	fft = fopen(fftfile, "r");
 	if (!fft) {
 		printf("No %s file found. Using default fft lengths.\n", fftfile);
@@ -2012,13 +2031,15 @@ void threadbench(int n, int passes, int device_number) {
 	cutilSafeCall(cudaEventDestroy(start));
 	cutilSafeCall(cudaEventDestroy(stop));
 	
-	char threadfile[32];
+	char threadfile[256];
+	char devname[256];
+	remove_spaces(devname, dev.name);
 	
-	sprintf(threadfile, "%s threads.txt", dev.name);
+	sprintf(threadfile, "%s_threads.txt", devname);
 	FILE *fptr;
 	fptr = fopen(threadfile, "a+");
 	if (!fptr)
-		printf("Can't open %s threads.txt\n", dev.name);
+		printf("Can't open %s_threads.txt\n", devname);
 	else
 		fprintf(fptr, "%5d %4d %4d %4d %8.4f\n", n / 1024, threads[best_t1], threads[best_t2], threads[best_t3], best_time / passes);
 	
@@ -2110,10 +2131,13 @@ void cufftbench(int cufftbench_s, int cufftbench_e, int passes, int device_numbe
 			total[i] = 0.0f;
 		i--;
 	}
-	char fftfile[32];
+	char fftfile[256];
+	char devname[256];
+	remove_spaces(devname, dev.name);
+
 	FILE *fptr;
 	
-	sprintf(fftfile, "%s fft.txt", dev.name);
+	sprintf(fftfile, "%s_fft.txt", devname);
 	fptr = fopen(fftfile, "w");
 	if (!fptr) {
 		printf("Cannot open %s.\n", fftfile);
