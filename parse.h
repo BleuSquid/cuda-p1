@@ -37,8 +37,8 @@ extern "C" enum ASSIGNMENT_ERRORS get_next_assignment(char *filename, int *expon
 		LINE_BUFFER *assignment_key, int *b1, int *b2);
 extern "C" enum ASSIGNMENT_ERRORS clear_assignment(char *filename, int exponent);
 extern "C" int valid_assignment(int exp, int fft_length);	// nonzero if assignment is not horribly invalid
-extern "C" int IniGetInt(char* ini_file, char* name, int* value, int dfault);
-extern "C" int IniGetStr(char* ini_file, char* name, char* str, char* dfault);
+extern "C" int IniGetInt(const char* ini_file, const char* name, int* value, int dfault);
+extern "C" int IniGetStr(const char* ini_file, const char* name, char* str, const char* dfault);
 extern "C" int file_exists(char* filename);  // nonzero if file exists
 extern "C" FILE* fopen_and_lock(const char *path, const char *mode);
 extern "C" int unlock_and_fclose(FILE* f);

@@ -760,7 +760,7 @@ enum ASSIGNMENT_ERRORS clear_assignment(char *filename, int exponent) {
 /*----------------------------------------------------------------------------------------------*/
 /* These functions are slightly more modified from Oliver's equivalents. */
 
-int IniGetInt(char *inifile, char *name, int *value, int dflt) {
+int IniGetInt(const char *inifile, const char *name, int *value, int dflt) {
 	FILE *in;
 	char buf[MAX_LINE_LENGTH + 1];
 	int found = 0;
@@ -780,7 +780,7 @@ int IniGetInt(char *inifile, char *name, int *value, int dflt) {
 	return 0;
 }
 
-int IniGetStr(char *inifile, char *name, char *string, char* dflt) {
+int IniGetStr(const char *inifile, const char *name, char *string, const char* dflt) {
 	FILE *in;
 	char buf[MAX_LINE_LENGTH + 1];
 	int found = 0;
