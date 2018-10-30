@@ -1,5 +1,12 @@
+# input/output files
 results.txt
 worktodo.txt
+
+# Final Binary
+CUDAPm1
+
+# Checkpoint Files
+[tc][0-9][0-9]*s[12]
 
 
 # From https://github.com/github/gitignore/
