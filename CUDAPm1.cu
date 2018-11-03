@@ -983,7 +983,7 @@ int gtpr(int n, uint8* bprimes) {
 	
 	SegSieve<<<grid, threadsPerBlock, 0>>>(device_primes, np, primes_per_thread, n, results);
 	
-	cutilSafeCall(cudaThreadSynchronize());
+	cutilSafeCall(cutilDeviceSynchronize());
 	cutilSafeCall(cudaMemcpy(bprimes, results, sizeof(uint8) * (n >> 1), cudaMemcpyDeviceToHost));
 	cudaFree(device_primes);
 	cudaFree(results);
