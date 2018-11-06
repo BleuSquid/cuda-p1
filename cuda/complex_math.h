@@ -1,3 +1,6 @@
+#ifndef _CUDA_CUDA_COMPLEX_MATH_H
+#define _CUDA_CUDA_COMPLEX_MATH_H
+
 #include <cuComplex.h>
 
 __host__ __device__ static __inline__ cuDoubleComplex cuCsqr(cuDoubleComplex a) {
@@ -8,3 +11,5 @@ __host__ __device__ static __inline__ cuDoubleComplex cuCsqr(cuDoubleComplex a) 
 							2.0 * cuCreal(a) * cuCimag(a));
 	return result;
 }
+
+#endif /* _CUDA_CUDA_COMPLEX_MATH_H */

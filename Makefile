@@ -44,6 +44,8 @@ LIBS = -lcufft -lcudart -lm -lgmp
 LDFLAGS = $(COMMON_LDFLAGS) -fPIC -Wl,-O1 -Wl,--as-needed -Wl,--sort-common -Wl,--relax
 DEBUG_LDFLAGS = $(COMMON_LDFLAGS) -fPIC
 
+CUDA_SRCS = $(wildcard cuda/*.cu)
+CUDA_OBJS = $(patsubst %.cu,%.o, $(CUDA_SRCS))
 OBJS = parse.o rho.o CUDAPm1.o
 
 debug: NVCC_CFLAGS = $(NVCC_DEBUG_CFLAGS)
@@ -52,17 +54,20 @@ debug: LDFLAGS = $(DEBUG_LDFLAGS)
 
 all: $(BIN)
 
-$(BIN) $(DEBUG_BIN): $(OBJS)
+$(BIN) $(DEBUG_BIN): $(OBJS) $(CUDA_OBJS)
 	$(CXX) $^ $(CFLAGS) $(LDFLAGS) $(LIBS) -o $@
 
-CUDAPm1.o: CUDAPm1.cu parse.h cuda_safecalls.h rho.h complex_math.cu CUDAPm1.h
+CUDAPm1.o: CUDAPm1.cu parse.h cuda/cuda_functions.h cuda/cuda_safecalls.h rho.h CUDAPm1.h
 	$(NVCC) $(NVCC_CFLAGS) -c $<
+
+cuda/%.o: cuda/%.cu cuda/complex_math.h cuda/cuda_functions.h
+	$(NVCC) $(NVCC_CFLAGS) -c $< --output-directory cuda/
 
 %.o: %.c %.h
 	$(CC) $(CFLAGS) -c $<
 
 clean: clean-test
-	rm -f *.o *~
+	rm -f *.o *~ $(OBJS) $(CUDA_OBJS)
 	rm -f $(BIN) $(DEBUG_BIN)
 
 debug: $(DEBUG_BIN)
@@ -76,7 +81,7 @@ test-b2: $(BIN) clean-test
 	./$(BIN) -noinfo 7990427 -b1 983 -b2 124000
 
 clean-test:
-	rm -f *968819* *7990427*
+	rm -f *968819* *7990427* results.txt
 
 
 help:

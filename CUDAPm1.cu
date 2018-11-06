@@ -32,25 +32,12 @@ char program[] = "CUDAPm1 v0.21";
 #include <cuda_runtime.h>
 #include <cufft.h>
 
-#include "cuda_safecalls.h"
+#include "cuda/cuda_safecalls.h"
 #include "parse.h"
 #include "CUDAPm1.h"
 #include "rho.h"
+#include "cuda/cuda_functions.h"
 
-#include "complex_math.cu"
-
-/* In order to have the gettimeofday() function, you need these includes on Linux:
- #include <sys/time.h>
- #include <unistd.h>
- On Windows, you need
- #include <winsock2.h> and a definition for
- int gettimeofday (struct timeval *tv, struct timezone *) {}
- Both platforms are taken care of in parse.h and parse.c. */
-
-/************************ definitions ************************************/
-/* http://www.kurims.kyoto-u.ac.jp/~ooura/fft.html
- base code from Takuya OOURA.  */
-/* global variables needed */
 double *g_ttmp, *g_ttp1;
 double *g_x, *g_ct;
 double *e_data;
@@ -83,833 +70,6 @@ char input_filename[132], RESULTSFILE[132];
 char INIFILE[132] = "CUDAPm1.ini";
 char AID[132];  // Assignment key
 char s_residue[32];
-
-__constant__ double g_ttp_inc[2];
-
-__constant__ int g_qn[2];
-
-/************************ kernels ************************************/
-# define RINT_x86(x) (floor(x+0.5))
-# define RINT(x)  __rintd(x)
-
-void set_ttp_inc(double *h_ttp_inc) {
-	cudaMemcpyToSymbol(g_ttp_inc, h_ttp_inc, 2 * sizeof(double));
-}
-
-void set_qn(int *h_qn) {
-	cudaMemcpyToSymbol(g_qn, h_qn, 2 * sizeof(int));
-}
-
-__global__ void square(int n, double *a, double *ct) {
-	const int j2 = blockIdx.x * blockDim.x + threadIdx.x;
-	cuDoubleComplex wk, x, y, aj, ak;
-	const int m = n >> 1;
-	const int nc = n >> 2;
-	const int j = j2 << 1;
-	
-	int index[2];
-	
-	if (j2) {
-		index[0] = j;
-		index[1] = n - j;
-		
-		wk.x = 0.5 - ct[nc - j2];
-		wk.y = ct[j2];
-		aj.x = a[index[0]];
-		aj.y = a[index[0] + 1];
-		ak.x = a[index[1]];
-		ak.y = a[index[1] + 1];
-		
-		x.x = aj.x - ak.x;
-		x.y = aj.y + ak.y;
-		
-		y = cuCmul(wk,x);
-		
-		aj.x -= y.x;
-		aj.y -= y.y;
-		ak.x += y.x;
-		ak.y -= y.y;
-		
-		x = cuCsqr(aj);
-		y = cuCsqr(ak);
-		
-		aj.x = x.x - y.x;
-		aj.y = x.y + y.y;
-		ak.x = wk.x * aj.x + wk.y * aj.y;
-		ak.y = wk.x * aj.y - wk.y * aj.x;
-		
-		aj.x = x.x - ak.x;
-		aj.y = ak.y - x.y;
-		ak.x = y.x + ak.x;
-		ak.y = ak.y - y.y;
-		
-	} else {
-		
-		index[0] = 0;
-		index[1] = m;
-		
-		x.x = a[index[0]];
-		x.y = a[index[0] + 1];
-		
-		aj.x = x.x * x.x + x.y * x.y;
-		aj.y = -2 * x.x * x.y;
-		
-		y.x = a[index[1]];
-		y.y = -a[index[1] + 1];
-		ak = cuCsqr(y);
-	}
-	a[index[0]] = aj.x;
-	a[index[0] + 1] = aj.y;
-	a[index[1]] = ak.x;
-	a[index[1] + 1] = ak.y;
-}
-
-__global__ void square1(int n, double *b, double *a, double *ct) {
-	const int j2 = blockIdx.x * blockDim.x + threadIdx.x;
-	double wkr, wki, xr, xi, yr, yi, ajr, aji, akr, aki;
-	double new_ajr, new_aji, new_akr, new_aki;
-	const int m = n >> 1;
-	const int nc = n >> 2;
-	const int j = j2 << 1;
-	
-	if (j2) {
-		int nminusj = n - j;
-		wkr = 0.5 - ct[nc - j2];
-		wki = ct[j2];
-		ajr = a[j];
-		aji = a[1 + j];
-		akr = a[nminusj];
-		aki = a[1 + nminusj];
-		
-		new_aji = 2.0 * ajr * aji;
-		new_ajr = (ajr - aji) * (ajr + aji);
-		new_aki = 2.0 * akr * aki;
-		new_akr = (akr - aki) * (akr + aki);
-		
-		xr = new_ajr - new_akr;
-		xi = new_aji + new_aki;
-		yr = wkr * xr + wki * xi;
-		yi = wkr * xi - wki * xr;
-		
-		b[j] = new_ajr - yr;
-		b[1 + j] = yi - new_aji;
-		b[nminusj] = new_akr + yr;
-		b[1 + nminusj] = yi - new_aki;
-	} else {
-		xr = a[0];
-		xi = a[1];
-		b[0] = xr * xr + xi * xi;
-		b[1] = -xr * xi - xi * xr;
-		xr = a[0 + m];
-		xi = a[1 + m];
-		b[1 + m] = -xr * xi - xi * xr;
-		b[0 + m] = xr * xr - xi * xi;
-	}
-}
-
-__global__ void mult2(double *g_out, double *a, double *b, double *ct, int n) {
-	const int j2 = blockIdx.x * blockDim.x + threadIdx.x;
-	double wkr, wki, xr, xi, yr, yi, ajr, aji, akr, aki;
-	double new_ajr, new_aji, new_akr, new_aki;
-	const int m = n >> 1;
-	const int nc = n >> 2;
-	const int j = j2 << 1;
-	
-	if (j2) {
-		int nminusj = n - j;
-		
-		wkr = 0.5 - ct[nc - j2];
-		wki = ct[j2];
-		ajr = a[j];
-		aji = a[1 + j];
-		akr = a[nminusj];
-		aki = a[1 + nminusj];
-		xr = ajr - akr;
-		xi = aji + aki;
-		yr = wkr * xr - wki * xi;
-		yi = wkr * xi + wki * xr;
-		ajr -= yr;
-		aji -= yi;
-		akr += yr;
-		aki -= yi;
-		xr = b[j];
-		xi = b[1 + j];
-		yr = b[nminusj];
-		yi = b[1 + nminusj];
-		
-		new_aji = ajr * xi + xr * aji;
-		new_ajr = ajr * xr - aji * xi;
-		
-		new_aki = akr * yi + yr * aki;
-		new_akr = akr * yr - aki * yi;
-		
-		xr = new_ajr - new_akr;
-		xi = new_aji + new_aki;
-		yr = wkr * xr + wki * xi;
-		yi = wkr * xi - wki * xr;
-		
-		g_out[j] = new_ajr - yr;
-		g_out[1 + j] = yi - new_aji;
-		g_out[nminusj] = new_akr + yr;
-		g_out[1 + nminusj] = yi - new_aki;
-	} else {
-		xr = a[0];
-		xi = a[1];
-		yr = b[0];
-		yi = b[1];
-		g_out[0] = xr * yr + xi * yi;
-		g_out[1] = -xr * yi - xi * yr;
-		xr = a[0 + m];
-		xi = a[1 + m];
-		yr = b[0 + m];
-		yi = b[1 + m];
-		g_out[1 + m] = -xr * yi - xi * yr;
-		g_out[0 + m] = xr * yr - xi * yi;
-	}
-}
-
-__global__ void mult3(double *g_out, double *a, double *b, double *ct, int n) {
-	const int j2 = blockIdx.x * blockDim.x + threadIdx.x;
-	double wkr, wki, xr, xi, yr, yi, ajr, aji, akr, aki, bjr, bji, bkr, bki;
-	double new_ajr, new_aji, new_akr, new_aki;
-	const int m = n >> 1;
-	const int nc = n >> 2;
-	const int j = j2 << 1;
-	
-	if (j2) {
-		int nminusj = n - j;
-		
-		wkr = 0.5 - ct[nc - j2];
-		wki = ct[j2];
-		
-		ajr = a[j];
-		aji = a[1 + j];
-		akr = a[nminusj];
-		aki = a[1 + nminusj];
-		xr = ajr - akr;
-		xi = aji + aki;
-		yr = wkr * xr - wki * xi;
-		yi = wkr * xi + wki * xr;
-		ajr -= yr;
-		aji -= yi;
-		akr += yr;
-		aki -= yi;
-		
-		bjr = b[j];
-		bji = b[1 + j];
-		bkr = b[nminusj];
-		bki = b[1 + nminusj];
-		xr = bjr - bkr;
-		xi = bji + bki;
-		yr = wkr * xr - wki * xi;
-		yi = wkr * xi + wki * xr;
-		bjr -= yr;
-		bji -= yi;
-		bkr += yr;
-		bki -= yi;
-		
-		new_aji = ajr * bji + bjr * aji;
-		new_ajr = ajr * bjr - aji * bji;
-		new_aki = akr * bki + bkr * aki;
-		new_akr = akr * bkr - aki * bki;
-		
-		xr = new_ajr - new_akr;
-		xi = new_aji + new_aki;
-		yr = wkr * xr + wki * xi;
-		yi = wkr * xi - wki * xr;
-		g_out[j] = new_ajr - yr;
-		g_out[1 + j] = yi - new_aji;
-		g_out[nminusj] = new_akr + yr;
-		g_out[1 + nminusj] = yi - new_aki;
-	} else {
-		xr = a[0];
-		xi = a[1];
-		yr = b[0];
-		yi = b[1];
-		g_out[0] = xr * yr + xi * yi;
-		g_out[1] = -xr * yi - xi * yr;
-		xr = a[0 + m];
-		xi = a[1 + m];
-		yr = b[0 + m];
-		yi = b[1 + m];
-		g_out[1 + m] = -xr * yi - xi * yr;
-		g_out[0 + m] = xr * yr - xi * yi;
-	}
-}
-
-__global__ void sub_mul(double *g_out, double *a, double *b1, double *b2, double *ct, int n) {
-	const int j2 = blockIdx.x * blockDim.x + threadIdx.x;
-	double wkr, wki, xr, xi, yr, yi, ajr, aji, akr, aki, bjr, bji, bkr, bki;
-	double new_ajr, new_aji, new_akr, new_aki;
-	const int m = n >> 1;
-	const int nc = n >> 2;
-	const int j = j2 << 1;
-	
-	if (j2) {
-		int nminusj = n - j;
-		
-		wkr = 0.5 - ct[nc - j2];
-		wki = ct[j2];
-		
-		ajr = a[j];
-		aji = a[1 + j];
-		akr = a[nminusj];
-		aki = a[1 + nminusj];
-		xr = ajr - akr;
-		xi = aji + aki;
-		yr = wkr * xr - wki * xi;
-		yi = wkr * xi + wki * xr;
-		ajr -= yr;
-		aji -= yi;
-		akr += yr;
-		aki -= yi;
-		
-		bjr = b1[j] - b2[j];
-		bji = b1[1 + j] - b2[1 + j];
-		bkr = b1[nminusj] - b2[nminusj];
-		bki = b1[1 + nminusj] - b2[1 + nminusj];
-		
-		new_aji = ajr * bji + bjr * aji;
-		new_ajr = ajr * bjr - aji * bji;
-		new_aki = akr * bki + bkr * aki;
-		new_akr = akr * bkr - aki * bki;
-		
-		xr = new_ajr - new_akr;
-		xi = new_aji + new_aki;
-		yr = wkr * xr + wki * xi;
-		yi = wkr * xi - wki * xr;
-		g_out[j] = new_ajr - yr;
-		g_out[1 + j] = yi - new_aji;
-		g_out[nminusj] = new_akr + yr;
-		g_out[1 + nminusj] = yi - new_aki;
-	} else {
-		xr = a[0];
-		xi = a[1];
-		yr = b1[0] - b2[0];
-		yi = b1[1] - b2[1];
-		g_out[0] = xr * yr + xi * yi;
-		g_out[1] = -xr * yi - xi * yr;
-		xr = a[0 + m];
-		xi = a[1 + m];
-		yr = b1[0 + m] - b2[0 + m];
-		yi = b1[1 + m] - b2[1 + m];
-		g_out[1 + m] = -xr * yi - xi * yr;
-		g_out[0 + m] = xr * yr - xi * yi;
-	}
-}
-
-__global__ void pre_mul(int n, double *a, double *ct) {
-	const int j2 = blockIdx.x * blockDim.x + threadIdx.x;
-	double wkr, wki, xr, xi, yr, yi, ajr, aji, akr, aki;
-	const int nc = n >> 2;
-	const int j = j2 << 1;
-	
-	if (j2) {
-		int nminusj = n - j;
-		
-		wkr = 0.5 - ct[nc - j2];
-		wki = ct[j2];
-		ajr = a[j];
-		aji = a[1 + j];
-		akr = a[nminusj];
-		aki = a[1 + nminusj];
-		xr = ajr - akr;
-		xi = aji + aki;
-		yr = wkr * xr - wki * xi;
-		yi = wkr * xi + wki * xr;
-		ajr -= yr;
-		aji -= yi;
-		akr += yr;
-		aki -= yi;
-		a[j] = ajr;
-		a[1 + j] = aji;
-		a[nminusj] = akr;
-		a[1 + nminusj] = aki;
-	}
-}
-
-__device__ static double __rintd(double z) {
-	double y;
-	
-	asm ("cvt.rni.f64.f64 %0, %1;": "=d" (y):"d" (z));
-	return (y);
-}
-
-__global__ void apply_weights(double *g_out, int *g_in, double *g_ttmp) {
-	int val[2], test = 1;
-	double ttp_temp[2];
-	const int index = (blockIdx.x * blockDim.x + threadIdx.x) << 1;
-	
-	val[0] = g_in[index];
-	val[1] = g_in[index + 1];
-	ttp_temp[0] = g_ttmp[index];
-	ttp_temp[1] = fabs(g_ttmp[index + 1]);
-	
-	test = ttp_temp[0] < 0.0 ? 0 : 1;
-	
-	g_out[index + 1] = (double) val[1] * ttp_temp[1];
-	ttp_temp[1] *= -g_ttp_inc[test];
-	g_out[index] = (double) val[0] * ttp_temp[1];
-}
-
-template <int g_err_flag>
-__global__ void norm1a(double *g_in, int *g_data, int *g_xint, double *g_ttmp, int *g_carry, volatile float *g_err, float maxerr) {
-	long long int bigint[2];
-	int val[2], numbits[2] = {g_qn[0], g_qn[0]}, mask[2], shifted_carry, carry_tmp, err_tmp;
-	double ttp_temp;
-	const int index = (blockIdx.x * blockDim.x + threadIdx.x) << 1;
-	const int index1 = blockIdx.x << 1;
-	__shared__ int carry[1024 + 1];
-	
-	double tval[2], trint[2];
-	float ferr[2];
-	
-	tval[0] = g_ttmp[index];
-	ttp_temp = g_ttmp[index + 1];
-	trint[0] = g_in[index];
-	trint[1] = g_in[index + 1];
-	if (tval[0] < 0.0) {
-		numbits[0]++;
-		tval[0] = -tval[0];
-	}
-	if (ttp_temp < 0.0) {
-		numbits[1]++;
-		ttp_temp = -ttp_temp;
-	}
-	tval[1] = tval[0] * g_ttp_inc[numbits[0] == g_qn[0]];
-	tval[0] = trint[0] * tval[0];
-	tval[1] = trint[1] * tval[1];
-	trint[0] = RINT(tval[0]);
-	ferr[0] = fabs(tval[0] - trint[0]);
-	bigint[0] = (long long int) trint[0];
-	trint[1] = RINT(tval[1]);
-	ferr[1] = fabs(tval[1] - trint[1]);
-	bigint[1] = (long long int) trint[1];
-	mask[0] = -1 << numbits[0];
-	mask[1] = -1 << numbits[1];
-	ferr[0] = fmax(ferr[0], ferr[1]);
-	
-	err_tmp = __float_as_int(ferr[0]);
-	
-	if (ferr[0] > maxerr)
-		atomicMax((int*) g_err, err_tmp);
-	val[1] = ((int) bigint[1]) & ~mask[1];
-	carry[threadIdx.x + 1] = (int) (bigint[1] >> numbits[1]);
-	__syncthreads();
-	
-	carry_tmp = carry[threadIdx.x];
-	val[0] = ((int) bigint[0]) & ~mask[0];
-	val[1] += (int) (bigint[0] >> numbits[0]);
-	
-	if (threadIdx.x)
-		val[0] += carry_tmp;
-	shifted_carry = val[1] - (mask[1] >> 1);
-	val[1] = val[1] - (shifted_carry & mask[1]);
-	carry[threadIdx.x] = shifted_carry >> numbits[1];
-	__syncthreads();
-	
-	carry_tmp = carry[threadIdx.x + 1] + carry[threadIdx.x];
-	shifted_carry = val[0] - (mask[0] >> 1);
-	val[0] = val[0] - (shifted_carry & mask[0]);
-	val[1] += shifted_carry >> numbits[0];
-	
-	if (threadIdx.x == (blockDim.x - 1)) {
-		if (blockIdx.x == gridDim.x - 1)
-			g_carry[0] = carry_tmp;
-		else
-			g_carry[blockIdx.x + 1] = carry_tmp;
-	}
-	
-	if (threadIdx.x) {
-		val[0] += carry[threadIdx.x - 1];
-		
-		g_in[index + 1] = (double) val[1] * ttp_temp;
-		ttp_temp *= -g_ttp_inc[numbits[0] == g_qn[0]];
-		g_in[index] = (double) val[0] * ttp_temp;
-		if (g_err_flag) {
-			g_xint[index + 1] = val[1];
-			g_xint[index] = val[0];
-		}
-	} else {
-		g_data[index1] = val[0];
-		g_data[index1 + 1] = val[1];
-	}
-}
-
-template <int g_err_flag>
-__global__ void norm1b(double *g_in, long long int *g_data, int *g_xint, double *g_ttmp, long long int *g_carry, volatile float *g_err,
-		float maxerr) {
-	long long int bigint[2], shifted_carry, carry_tmp;
-	int numbits[2] = {g_qn[0], g_qn[0]}, mask[2];
-	double ttp_temp;
-	const int index = (blockIdx.x * blockDim.x + threadIdx.x) << 1;
-	const int index1 = blockIdx.x << 1;
-	__shared__ long long int carry[1024 + 1];
-	
-	double tval[2], trint[2];
-	float ferr[2];
-	
-	tval[0] = g_ttmp[index];
-	ttp_temp = g_ttmp[index + 1];
-	trint[0] = g_in[index];
-	trint[1] = g_in[index + 1];
-	if (tval[0] < 0.0) {
-		numbits[0]++;
-		tval[0] = -tval[0];
-	}
-	if (ttp_temp < 0.0) {
-		numbits[1]++;
-		ttp_temp = -ttp_temp;
-	}
-	tval[1] = tval[0] * g_ttp_inc[numbits[0] == g_qn[0]];
-	tval[0] = trint[0] * tval[0];
-	tval[1] = trint[1] * tval[1];
-	trint[0] = RINT(tval[0]);
-	ferr[0] = fabs(tval[0] - trint[0]);
-	bigint[0] = (long long int) trint[0];
-	trint[1] = RINT(tval[1]);
-	ferr[1] = fabs(tval[1] - trint[1]);
-	bigint[1] = (long long int) trint[1];
-	mask[0] = -1 << numbits[0];
-	mask[1] = -1 << numbits[1];
-	ferr[0] = fmax(ferr[0], ferr[1]);
-	
-	if (ferr[0] > maxerr) {
-		atomicMax((int*) g_err, __float_as_int(ferr[0]));
-	}
-	bigint[0] *= 3;
-	bigint[1] *= 3;
-	carry[threadIdx.x + 1] = (bigint[1] >> numbits[1]);
-	__syncthreads();
-	
-	carry_tmp = carry[threadIdx.x];
-	bigint[1] = bigint[1] & ~mask[1];
-	bigint[1] += bigint[0] >> numbits[0];
-	bigint[0] = bigint[0] & ~mask[0];
-	
-	if (threadIdx.x) {
-		bigint[0] += carry_tmp;
-	}
-	shifted_carry = bigint[1] - (mask[1] >> 1);
-	bigint[1] = bigint[1] - (shifted_carry & mask[1]);
-	carry[threadIdx.x] = shifted_carry >> numbits[1];
-	__syncthreads();
-	
-	carry_tmp = carry[threadIdx.x + 1] + carry[threadIdx.x];
-	shifted_carry = bigint[0] - (mask[0] >> 1);
-	bigint[0] = bigint[0] - (shifted_carry & mask[0]);
-	bigint[1] += shifted_carry >> numbits[0];
-	
-	if (threadIdx.x == (blockDim.x - 1)) {
-		if (blockIdx.x == gridDim.x - 1) {
-			g_carry[0] = carry_tmp;
-		} else {
-			g_carry[blockIdx.x + 1] = carry_tmp;
-		}
-	}
-	
-	if (threadIdx.x) {
-		bigint[0] += carry[threadIdx.x - 1];
-		g_in[index + 1] = (double) bigint[1] * ttp_temp;
-		ttp_temp *= -g_ttp_inc[numbits[0] == g_qn[0]];
-		g_in[index] = (double) bigint[0] * ttp_temp;
-		if (g_err_flag) {
-			g_xint[index + 1] = bigint[1];
-			g_xint[index] = bigint[0];
-		}
-	} else {
-		g_data[index1] = bigint[0];
-		g_data[index1 + 1] = bigint[1];
-	}
-}
-
-template <int g_err_flag>
-__global__ void norm2a(double *g_x, int *g_xint, int g_N, int threads1, int *g_data, int *g_carry, double *g_ttp1) {
-	const int threadID = blockIdx.x * blockDim.x + threadIdx.x;
-	const int threadID1 = threadID << 1;
-	const int j = (threads1 * threadID) << 1;
-	int temp0, temp1;
-	int mask, shifted_carry, numbits = g_qn[0];
-	double temp;
-	
-	if (j < g_N) {
-		temp0 = g_data[threadID1] + g_carry[threadID];
-		temp1 = g_data[threadID1 + 1];
-		temp = g_ttp1[threadID];
-		if (temp < 0.0) {
-			numbits++;
-			temp = -temp;
-		}
-		mask = -1 << numbits;
-		shifted_carry = temp0 - (mask >> 1);
-		temp0 = temp0 - (shifted_carry & mask);
-		temp1 += (shifted_carry >> numbits);
-		g_x[j + 1] = temp1 * temp;
-		temp *= -g_ttp_inc[numbits == g_qn[0]];
-		g_x[j] = temp0 * temp;
-		if (g_err_flag) {
-			g_xint[j + 1] = temp1;
-			g_xint[j] = temp0;
-		}
-	}
-}
-
-template <int g_err_flag>
-__global__ void norm2b(double *g_x, int *g_xint, int g_N, int threads1, long long int *g_data, long long int *g_carry, double *g_ttp1) {
-	
-	const int threadID = blockIdx.x * blockDim.x + threadIdx.x;
-	const int threadID1 = threadID << 1;
-	const int j = (threads1 * threadID) << 1;
-	long long int shifted_carry, temp0, temp1;
-	int mask, numbits = g_qn[0];
-	double temp;
-	
-	if (j < g_N) {
-		temp0 = g_data[threadID1] + g_carry[threadID];
-		temp1 = g_data[threadID1 + 1];
-		temp = g_ttp1[threadID];
-		
-		if (temp < 0.0) {
-			numbits++;
-			temp = -temp;
-		}
-		
-		mask = -1 << numbits;
-		shifted_carry = temp0 - (mask >> 1);
-		temp0 = temp0 - (shifted_carry & mask);
-		temp1 = temp1 + (shifted_carry >> numbits);
-		g_x[j + 1] = temp1 * temp;
-		temp *= -g_ttp_inc[numbits == g_qn[0]];
-		g_x[j] = temp0 * temp;
-		
-		if (g_err_flag) {
-			g_xint[j + 1] = temp1;
-			g_xint[j] = temp0;
-		}
-	}
-}
-
-__global__ void copy_kernel(double *save, double *y) {
-	const int threadID = (blockIdx.x * blockDim.x + threadIdx.x) << 1;
-	save[threadID] = y[threadID];
-	save[threadID + 1] = y[threadID + 1];
-}
-
-/****************************************************************************
- *                                Erato                                     *
- ***************************************************************************/
-//Many thanks to Ben Buhrow.
-typedef unsigned char u8;
-typedef unsigned int uint32;
-typedef unsigned char uint8;
-typedef unsigned short uint16;
-typedef long long unsigned int uint64;
-
-const int threadsPerBlock = 256;
-const uint32 block_size = 8192;
-const int startprime = 8;
-
-__constant__ uint32 _step5[5]		= {2418280706, 604570176, 151142544, 37785636, 1083188233};
-__constant__ uint32 _step7[7]		= {1107363844, 69210240, 2151809288, 134488080, 276840961, 17302560, 537952322};
-__constant__ uint32 _step11[11]		= {33816584, 1073774848, 135266336, 132096, 541065345, 528384, 2164261380, 2113536,
-										67110928, 8454146, 268443712};
-__constant__ uint32 _step13[13]		= {1075838992, 16809984, 262656, 536875016, 8388672, 67239937, 1050624, 2147500064,
-										33554688, 268959748, 4202496, 65664, 134218754};
-__constant__ uint32 _step17[17]		= {268435488, 1073741952, 512, 2049, 8196, 32784, 131136, 524544, 2098176, 8392704,
-										33570816, 134283264, 537133056, 2148532224, 4194304, 16777218, 67108872};
-__constant__ uint32 _step19[19]		= {2147483712, 4096, 262176, 16779264, 1073872896, 8388608, 536870928, 1024, 65544,
-										4194816, 268468224, 2097152, 134217732, 256, 16386, 1048704, 67117056, 524288,
-										33554433};
-
-__global__ static void SegSieve(uint32 *primes, int maxp, int nump, uint32 N, uint8 *results) {
-	/*
-	 expect as input a set of primes to sieve with, how many of those primes there are (maxp)
-	 how many primes each thread will be responsible for (nump), and the maximum index
-	 that we need to worry about for the requested sieve interval.  Also, an array into
-	 which we can put this block's count of primes.
-
-	 This routine implements a segmented sieve using a wheel mod 6.  Each thread block on the gpu
-	 sieves a different segment of the number line.  Each thread within each block simultaneously
-	 sieves a small set of primes, marking composites within shared memory.  There is no memory
-	 contention between threads because the marking process is write only.  Because each thread
-	 block starts at a different part of the number line, a small amount of computation must
-	 be done for each prime prior to sieving to figure out where to start.  After sieving
-	 is done, each thread counts primes in part of the shared memory space; the final count
-	 is returned in the provided array for each block.  The host cpu will do the final sum
-	 over blocks.  Note, it would not be much more difficult to compute and return the primes
-	 in the block instead of just the count, but it would be slower due to the extra
-	 memory transfer required.
-	 */
-
-	uint32 i, j, k;
-	uint32 maxID = (N + 1) / 3;
-	uint32 bid = blockIdx.y * gridDim.x + blockIdx.x;
-	uint32 range = block_size / threadsPerBlock;
-	__shared__ uint8 locsieve[block_size];
-	__shared__ uint32 bitsieve[block_size / 32];
-	
-// everyone init the array.
-	if ((bid + 1) * block_size > maxID) {
-		for (j = threadIdx.x * range, k = 0; k < range; k++) {
-			// we're counting hits in the kernel as well, so clear the bytes representing primes > N
-			if ((bid * block_size + j + k) < maxID)
-				locsieve[j + k] = 1;
-			else
-				locsieve[j + k] = 0;
-		}
-	} else {
-		for (j = threadIdx.x * range / 4, k = 0; k < range / 4; k++) {
-			((uint32 *) locsieve)[j + k] = 0x01010101;
-		}
-	}
-	
-// the smallest primes are dealt with a bit differently.  They are sieved in a separate
-// shared memory space in a packed bit array.  constant memory holds pre-computed
-// information about where each prime lands within a given 32 bit region.  each thread
-// in the block will use this info to simultaneously sieve a small portion of the
-// packed bit array (that way we make use of the broadcast capabilities of constant memory).
-// When counting or computing primes, we then have to check both the packed bit array as
-// well as the regular byte array, but overall it is a win to greatly speed up the
-// sieving of the smallest primes.
-	
-// compute starting offset for prime 5:
-	i = (bid * 256 + threadIdx.x) % 5;
-// then sieve prime 5 in the bit array
-	bitsieve[threadIdx.x] = _step5[i];
-	
-// compute starting offset for prime 7:
-	i = (bid * 256 + threadIdx.x) % 7;
-// then sieve prime 7 in the bit array
-	bitsieve[threadIdx.x] |= _step7[i];
-	
-// compute starting offset for prime 11:
-	i = (bid * 256 + threadIdx.x) % 11;
-// then sieve prime 11 in the bit array
-	bitsieve[threadIdx.x] |= _step11[i];
-	
-// compute starting offset for prime 13:
-	i = (bid * 256 + threadIdx.x) % 13;
-// then sieve prime 13 in the bit array
-	bitsieve[threadIdx.x] |= _step13[i];
-	
-// compute starting offset for prime 17:
-	i = (bid * 256 + threadIdx.x) % 17;
-// then sieve prime 17 in the bit array
-	bitsieve[threadIdx.x] |= _step17[i];
-	
-// compute starting offset for prime 19:
-	i = (bid * 256 + threadIdx.x) % 19;
-// then sieve prime 19 in the bit array
-	bitsieve[threadIdx.x] |= _step19[i];
-	
-// regroup before sieving
-	__syncthreads();
-	
-// now sieve the array
-	for (j = 0; j < nump; j++) {
-		int pid = (j * threadsPerBlock) + threadIdx.x + startprime;
-		
-		if (pid < maxp) {
-			uint32 p = primes[pid];
-			uint32 pstart = p / 3;
-			uint32 p2 = 2 * p;
-			uint32 block_start = bid * block_size;
-			uint32 start_offset;
-			uint32 s[2];
-			
-			// the wheel sieve with all multiples of 2 and 3 removed from the array is equivalent to
-			// alternately stepping through the number line by (p+2)*mult, (p-2)*mult,
-			// where mult = (p+1)/6
-			s[0] = p + (2 * ((p + 1) / 6));
-			s[1] = p - (2 * ((p + 1) / 6));
-			
-			// compute the starting location of this prime in this block
-			if ((bid == 0) || (pstart >= block_start)) {
-				// start one increment past the starting value of p/3, since
-				// we want to count the prime itself as a prime.
-				start_offset = pstart + s[0] - block_start;
-				k = 1;
-			} else {
-				// measure how far the start of this block is from where the prime first landed,
-				// as well as how many complete (+2/-2) steps it would need to take
-				// to cover that distance
-				uint32 dist = (block_start - pstart);
-				uint32 steps = dist / p2;
-				
-				if ((dist % p2) == 0) {
-					// if the number of steps is exact, then we hit the start
-					// of this block exactly, and we start below with the +2 step.
-					start_offset = 0;
-					k = 0;
-				} else {
-					uint32 inc = pstart + steps * p2 + s[0];
-					if (inc >= block_start) {
-						// if the prime reaches into this block on the first stride,
-						// then start below with the -2 step
-						start_offset = inc - block_start;
-						k = 1;
-					} else {
-						// we need both +2 and -2 strides to get into the block,
-						// so start below with the +2 stride.
-						start_offset = inc + s[1] - block_start;
-						k = 0;
-					}
-				}
-			}
-			
-			// unroll the loop for the smallest primes.
-			if (p < 1024) {
-				uint32 stop = block_size - (2 * p * 4);
-				
-				if (k == 0) {
-					for (i = start_offset; i < stop; i += 8 * p) {
-						locsieve[i] = 0;
-						locsieve[i + s[0]] = 0;
-						locsieve[i + p2] = 0;
-						locsieve[i + p2 + s[0]] = 0;
-						locsieve[i + 4 * p] = 0;
-						locsieve[i + 4 * p + s[0]] = 0;
-						locsieve[i + 6 * p] = 0;
-						locsieve[i + 6 * p + s[0]] = 0;
-					}
-				} else {
-					for (i = start_offset; i < stop; i += 8 * p) {
-						locsieve[i] = 0;
-						locsieve[i + s[1]] = 0;
-						locsieve[i + p2] = 0;
-						locsieve[i + p2 + s[1]] = 0;
-						locsieve[i + 4 * p] = 0;
-						locsieve[i + 4 * p + s[1]] = 0;
-						locsieve[i + 6 * p] = 0;
-						locsieve[i + 6 * p + s[1]] = 0;
-					}
-				}
-			} else
-				i = start_offset;
-			
-			// alternate stepping between the large and small strides this prime takes.
-			for (; i < block_size; k = !k) {
-				locsieve[i] = 0;
-				i += s[k];
-			}
-		}
-	}
-	
-// regroup before counting
-	__syncthreads();
-	
-	for (j = threadIdx.x * range, k = 0; k < range; k++)
-		locsieve[j + k] = (locsieve[j + k] & ((bitsieve[(j + k) >> 5] & (1 << ((j + k) & 31))) == 0));
-	
-	__syncthreads();
-	
-	if (threadIdx.x == 0)
-		for (k = 0; k < block_size; k++) {
-			j = ((bid * block_size + k) * 3 + 1) >> 1;
-			if (j < N >> 1)
-				results[j] = locsieve[k];
-		}
-}
 
 uint32 tiny_soe(uint32 limit, uint32 *primes) {
 //simple sieve of erathosthenes for small limits - not efficient
@@ -981,7 +141,7 @@ int gtpr(int n, uint8* bprimes) {
 	cudaMalloc((void**) &results, sizeof(uint8) * (n >> 1));
 	cudaMemset(results, 0, sizeof(uint8) * (n >> 1));
 	
-	SegSieve<<<grid, threadsPerBlock, 0>>>(device_primes, np, primes_per_thread, n, results);
+	cudaAcc_SegSieve(grid, threadsPerBlock, device_primes, np, primes_per_thread, n, results);
 	
 	cutilSafeCall(cutilDeviceSynchronize());
 	cutilSafeCall(cudaMemcpy(bprimes, results, sizeof(uint8) * (n >> 1), cudaMemcpyDeviceToHost));
@@ -1019,24 +179,24 @@ float lucas_square(/*double *x,*/int q, int n, int iter, int last, float* maxerr
 			*maxerr = terr;
 	}
 	cufftSafeCall(cufftExecZ2Z(plan, (cufftDoubleComplex *) g_x, (cufftDoubleComplex *) g_x, CUFFT_INVERSE));
-	square <<< n / (4 * threads2), threads2 >>> (n, g_x, g_ct);
+	cudaAcc_square(threads2, n, g_x, g_ct);
 	cufftSafeCall(cufftExecZ2Z(plan, (cufftDoubleComplex *) g_x, (cufftDoubleComplex *) g_x, CUFFT_INVERSE));
 	
 	if (chkpt) {
 		if (!bit) {
-			norm1a<1> <<<n / (2 * threads1), threads1 >>> (g_x, g_datai, g_xint, g_ttmp, g_carryi, g_err, *maxerr);
-			norm2a<1> <<< (n / (2 * threads1) + threads3 - 1) / threads3, threads3 >>> (g_x, g_xint, n, threads1, g_datai, g_carryi, g_ttp1);
+			cudaAcc_norm1a(1, threads1, n, g_x, g_datai, g_xint, g_ttmp, g_carryi, g_err, *maxerr);
+			cudaAcc_norm2a(1, threads1, threads3, g_x, g_xint, n, g_datai, g_carryi, g_ttp1);
 		} else {
-			norm1b<1> <<<n / (2 * threads1), threads1 >>> (g_x, g_datal, g_xint, g_ttmp, g_carryl, g_err, *maxerr);
-			norm2b<1> <<< (n / (2 * threads1) + threads3 - 1) / threads3, threads3 >>> (g_x, g_xint, n, threads1, g_datal, g_carryl, g_ttp1);
+			cudaAcc_norm1b(1, threads1, n, g_x, g_datal, g_xint, g_ttmp, g_carryl, g_err, *maxerr);
+			cudaAcc_norm2b(1, threads1, threads3, g_x, g_xint, n, g_datal, g_carryl, g_ttp1);
 		}
 	} else {
 		if (!bit) {
-			norm1a<0> <<<n / (2 * threads1), threads1 >>> (g_x, g_datai, g_xint, g_ttmp, g_carryi, g_err, *maxerr);
-			norm2a<0> <<< (n / (2 * threads1) + threads3 - 1) / threads3, threads3 >>> (g_x, g_xint, n, threads1, g_datai, g_carryi, g_ttp1);
+			cudaAcc_norm1a(0, threads1, n, g_x, g_datai, g_xint, g_ttmp, g_carryi, g_err, *maxerr);
+			cudaAcc_norm2a(0, threads1, threads3, g_x, g_xint, n, g_datai, g_carryi, g_ttp1);
 		} else {
-			norm1b<0> <<<n / (2 * threads1), threads1 >>> (g_x, g_datal, g_xint, g_ttmp, g_carryl, g_err, *maxerr);
-			norm2b<0> <<< (n / (2 * threads1) + threads3 - 1) / threads3, threads3 >>> (g_x, g_xint, n, threads1, g_datal, g_carryl, g_ttp1);
+			cudaAcc_norm1b(0, threads1, n, g_x, g_datal, g_xint, g_ttmp, g_carryl, g_err, *maxerr);
+			cudaAcc_norm2b(0, threads1, threads3, g_x, g_xint, n, g_datal, g_carryl, g_ttp1);
 		}
 	}
 	
@@ -1077,7 +237,7 @@ void E_init_d(double *g, double value, int n) {
 void E_pre_mul(double *g_out, double *g_in, int n, int fft_f) {
 	if (fft_f)
 		cufftSafeCall(cufftExecZ2Z(plan, (cufftDoubleComplex *) g_in, (cufftDoubleComplex *) g_out, CUFFT_INVERSE));
-	pre_mul <<<n / (4 * threads2), threads2>>> (n, g_out, g_ct);
+	cudaAcc_pre_mul(threads2, n, g_out, g_ct);
 }
 
 void E_mul(double *g_out, double *g_in1, double *g_in2, int n, float err, int fft_f) {
@@ -1085,31 +245,31 @@ void E_mul(double *g_out, double *g_in1, double *g_in2, int n, float err, int ff
 	if (fft_f)
 		cufftSafeCall(cufftExecZ2Z(plan, (cufftDoubleComplex *) g_in1, (cufftDoubleComplex *) g_in1, CUFFT_INVERSE));
 	
-	mult3 <<<n / (4 * threads2), threads2>>> (g_out, g_in1, g_in2, g_ct, n);
+	cudaAcc_mult3(threads2, n, g_out, g_in1, g_in2, g_ct);
 	cufftSafeCall(cufftExecZ2Z(plan, (cufftDoubleComplex *) g_out, (cufftDoubleComplex *) g_out, CUFFT_INVERSE));
-	norm1a<0> <<<n / (2 * threads1), threads1 >>> (g_out, g_datai, g_xint, g_ttmp, g_carryi, g_err, err);
-	norm2a<0> <<< (n / (2 * threads1) + threads3 - 1) / threads3, threads3 >>> (g_out, g_xint, n, threads1, g_datai, g_carryi, g_ttp1);
+	cudaAcc_norm1a(0, threads1, n, g_out, g_datai, g_xint, g_ttmp, g_carryi, g_err, err);
+	cudaAcc_norm2a(0, threads1, threads3, g_out, g_xint, n, g_datai, g_carryi, g_ttp1);
 }
 
 void E_sub_mul(double *g_out, double *g_in1, double *g_in2, double *g_in3, int n, float err, int chkpt) {
 	
 	cufftSafeCall(cufftExecZ2Z(plan, (cufftDoubleComplex *) g_in1, (cufftDoubleComplex *) g_in1, CUFFT_INVERSE));
-	sub_mul <<<n / (4 * threads2), threads2>>> (g_out, g_in1, g_in2, g_in3, g_ct, n);
+	cudaAcc_sub_mul(threads2, n, g_out, g_in1, g_in2, g_in3, g_ct);
 	cufftSafeCall(cufftExecZ2Z(plan, (cufftDoubleComplex *) g_out, (cufftDoubleComplex *) g_out, CUFFT_INVERSE));
 	if (chkpt) {
-		norm1a<1> <<<n / (2 * threads1), threads1 >>> (g_out, g_datai, &g_xint[n], g_ttmp, g_carryi, g_err, err);
-		norm2a<1> <<< (n / (2 * threads1) + threads3 - 1) / threads3, threads3 >>> (g_out, &g_xint[n], n, threads1, g_datai, g_carryi, g_ttp1);
+		cudaAcc_norm1a(1, threads1, n, g_out, g_datai, &g_xint[n], g_ttmp, g_carryi, g_err, err);
+		cudaAcc_norm2a(1, threads1, threads3, g_out, &g_xint[n], n, g_datai, g_carryi, g_ttp1);
 	} else {
-		norm1a<0> <<<n / (2 * threads1), threads1 >>> (g_out, g_datai, &g_xint[n], g_ttmp, g_carryi, g_err, err);
-		norm2a<0> <<< (n / (2 * threads1) + threads3 - 1) / threads3, threads3 >>> (g_out, &g_xint[n], n, threads1, g_datai, g_carryi, g_ttp1);
+		cudaAcc_norm1a(0, threads1, n, g_out, g_datai, &g_xint[n], g_ttmp, g_carryi, g_err, err);
+		cudaAcc_norm2a(0, threads1, threads3, g_out, &g_xint[n], n, g_datai, g_carryi, g_ttp1);
 	}
 }
 
 void E_half_mul(double *g_out, double *g_in1, double *g_in2, int n, float err) {
-	mult2 <<<n / (4 * threads2), threads2>>> (g_out, g_in1, g_in2, g_ct, n);
+	cudaAcc_mult2(threads2, n, g_out, g_in1, g_in2, g_ct);
 	cufftSafeCall(cufftExecZ2Z(plan, (cufftDoubleComplex *) g_out, (cufftDoubleComplex *) g_out, CUFFT_INVERSE));
-	norm1a<0> <<<n / (2 * threads1), threads1 >>> (g_out, g_datai, g_xint, g_ttmp, g_carryi, g_err, err);
-	norm2a<0> <<< (n / (2 * threads1) + threads3 - 1) / threads3, threads3 >>> (g_out, g_xint, n, threads1, g_datai, g_carryi, g_ttp1);
+	cudaAcc_norm1a(0, threads1, n, g_out, g_datai, g_xint, g_ttmp, g_carryi, g_err, err);
+	cudaAcc_norm2a(0, threads1, threads3, g_out, g_xint, n, g_datai, g_carryi, g_ttp1);
 }
 
 int E_to_the_p(double *g_out, double *g_in, mpz_t p, int n, int trans, float *err) {
@@ -1126,43 +286,43 @@ int E_to_the_p(double *g_out, double *g_in, mpz_t p, int n, int trans, float *er
 		E_init_d(g_out, 1.0, n);
 		if (mpz_tstbit(p, last - 1)) {
 			cufftSafeCall(cufftExecZ2Z(plan, (cufftDoubleComplex *) g_out, (cufftDoubleComplex *) g_out, CUFFT_INVERSE));
-			mult2 <<< n / (4 * threads2), threads2 >>> (g_out, g_out, g_in, g_ct, n);
+			cudaAcc_mult2(threads2, n, g_out, g_out, g_in, g_ct);
 			cufftSafeCall(cufftExecZ2Z(plan, (cufftDoubleComplex *) g_out, (cufftDoubleComplex *) g_out, CUFFT_INVERSE));
-			norm1a<0> <<<n / (2 * threads1), threads1 >>> (g_out, g_datai, g_xint, g_ttmp, g_carryi, g_err, *err);
-			norm2a<0> <<< (n / (2 * threads1) + threads3 - 1) / threads3, threads3 >>> (g_out, g_xint, n, threads1, g_datai, g_carryi, g_ttp1);
+			cudaAcc_norm1a(0, threads1, n, g_out, g_datai, g_xint, g_ttmp, g_carryi, g_err, *err);
+			cudaAcc_norm2a(0, threads1, threads3, g_out, g_xint, n, g_datai, g_carryi, g_ttp1);
 			trans += 2;
 		}
 		return trans;
 	}
 	
-	square1 <<< n / (4 * threads2), threads2 >>> (n, g_out, g_in, g_ct);
+	cudaAcc_square1(threads2, n, g_out, g_in, g_ct);
 	cufftSafeCall(cufftExecZ2Z(plan, (cufftDoubleComplex *) g_out, (cufftDoubleComplex *) g_out, CUFFT_INVERSE));
-	norm1a<0> <<<n / (2 * threads1), threads1 >>> (g_out, g_datai, g_xint, g_ttmp, g_carryi, g_err, *err);
-	norm2a<0> <<< (n / (2 * threads1) + threads3 - 1) / threads3, threads3 >>> (g_out, g_xint, n, threads1, g_datai, g_carryi, g_ttp1);
+	cudaAcc_norm1a(0, threads1, n, g_out, g_datai, g_xint, g_ttmp, g_carryi, g_err, *err);
+	cudaAcc_norm2a(0, threads1, threads3, g_out, g_xint, n, g_datai, g_carryi, g_ttp1);
 	trans += 2;
 	cutilSafeCall(cudaMemcpy(err, g_err, sizeof(float), cudaMemcpyDeviceToHost));
 	if (mpz_tstbit(p, last - 2)) {
 		cufftSafeCall(cufftExecZ2Z(plan, (cufftDoubleComplex *) g_out, (cufftDoubleComplex *) g_out, CUFFT_INVERSE));
-		mult2 <<< n / (4 * threads2), threads2 >>> (g_out, g_out, g_in, g_ct, n);
+		cudaAcc_mult2(threads2, n, g_out, g_out, g_in, g_ct);
 		cufftSafeCall(cufftExecZ2Z(plan, (cufftDoubleComplex *) g_out, (cufftDoubleComplex *) g_out, CUFFT_INVERSE));
-		norm1a<0> <<<n / (2 * threads1), threads1 >>> (g_out, g_datai, g_xint, g_ttmp, g_carryi, g_err, *err);
-		norm2a<0> <<< (n / (2 * threads1) + threads3 - 1) / threads3, threads3 >>> (g_out, g_xint, n, threads1, g_datai, g_carryi, g_ttp1);
+		cudaAcc_norm1a(0, threads1, n, g_out, g_datai, g_xint, g_ttmp, g_carryi, g_err, *err);
+		cudaAcc_norm2a(0, threads1, threads3, g_out, g_xint, n, g_datai, g_carryi, g_ttp1);
 		trans += 2;
 	}
 	
 	for (j = 3; j <= last && !quitting; j++) {
 		cufftSafeCall(cufftExecZ2Z(plan, (cufftDoubleComplex *) g_out, (cufftDoubleComplex *) g_out, CUFFT_INVERSE));
-		square <<< n / (4 * threads2), threads2 >>> (n, g_out, g_ct);
+		cudaAcc_square(threads2, n, g_out, g_ct);
 		cufftSafeCall(cufftExecZ2Z(plan, (cufftDoubleComplex *) g_out, (cufftDoubleComplex *) g_out, CUFFT_INVERSE));
-		norm1a<0> <<<n / (2 * threads1), threads1 >>> (g_out, g_datai, g_xint, g_ttmp, g_carryi, g_err, *err);
-		norm2a<0> <<< (n / (2 * threads1) + threads3 - 1) / threads3, threads3 >>> (g_out, g_xint, n, threads1, g_datai, g_carryi, g_ttp1);
+		cudaAcc_norm1a(0, threads1, n, g_out, g_datai, g_xint, g_ttmp, g_carryi, g_err, *err);
+		cudaAcc_norm2a(0, threads1, threads3, g_out, g_xint, n, g_datai, g_carryi, g_ttp1);
 		trans += 2;
 		if (mpz_tstbit(p, last - j)) {
 			cufftSafeCall(cufftExecZ2Z(plan, (cufftDoubleComplex *) g_out, (cufftDoubleComplex *) g_out, CUFFT_INVERSE));
-			mult2 <<< n / (4 * threads2), threads2 >>> (g_out, g_out, g_in, g_ct, n);
+			cudaAcc_mult2(threads2, n, g_out, g_out, g_in, g_ct);
 			cufftSafeCall(cufftExecZ2Z(plan, (cufftDoubleComplex *) g_out, (cufftDoubleComplex *) g_out, CUFFT_INVERSE));
-			norm1a<0> <<<n / (2 * threads1), threads1 >>> (g_out, g_datai, g_xint, g_ttmp, g_carryi, g_err, *err);
-			norm2a<0> <<< (n / (2 * threads1) + threads3 - 1) / threads3, threads3 >>> (g_out, g_xint, n, threads1, g_datai, g_carryi, g_ttp1);
+			cudaAcc_norm1a(0, threads1, n, g_out, g_datai, g_xint, g_ttmp, g_carryi, g_err, *err);
+			cudaAcc_norm2a(0, threads1, threads3, g_out, g_xint, n, g_datai, g_carryi, g_ttp1);
 			trans += 2;
 		}
 		if (trans - checkerror > 200) {
@@ -1934,7 +1094,7 @@ int* init_lucas_packed_int(unsigned * x_packed, int q, int *n, int *j, int *stag
 		balance_digits_int(x, q, *n);
 	}
 	init_x_int(x, x_packed, q, *n, stage);
-	apply_weights <<<*n / (2 * threads1), threads1>>> (g_x, g_xint, g_ttmp);
+	cudaAcc_apply_weights(*n, threads1, g_x, g_xint, g_ttmp);
 	return x;
 }
 
@@ -1987,11 +1147,10 @@ void threadbench(int n, int passes, int device_number) {
 							cutilSafeCall(cudaEventRecord(start, 0));
 							for (i = 0; i < 50; i++) {
 								cufftSafeCall(cufftExecZ2Z(plan, (cufftDoubleComplex *) g_x, (cufftDoubleComplex *) g_x, CUFFT_INVERSE));
-								square <<< n / (4 * threads[t2]), threads[t2] >>> (n, g_x, g_ct);
+								cudaAcc_square(threads[t2], n, g_x, g_ct);
 								cufftSafeCall(cufftExecZ2Z(plan, (cufftDoubleComplex *) g_x, (cufftDoubleComplex *) g_x, CUFFT_INVERSE));
-								norm1a<0> <<< n / (2 * threads[t1]), threads[t1] >>> (g_x, g_datai, g_xint, g_ttmp, g_carryi, g_err, maxerr);
-								norm2a<0> <<< (n / (2 * threads[t1]) + threads[t3] - 1) / threads[t3], threads[t3] >>>
-								(g_x, g_xint, n, threads[t1], g_datai, g_carryi, g_ttp1);
+								cudaAcc_norm1a(0, threads[t1], n, g_x, g_datai, g_xint, g_ttmp, g_carryi, g_err, maxerr);
+								cudaAcc_norm2a(0, threads[t1], threads[t3], g_x, g_xint, n, g_datai, g_carryi, g_ttp1);
 							}
 							cutilSafeCall(cudaEventRecord(stop, 0));
 							cutilSafeCall(cudaEventSynchronize(stop));
@@ -2095,10 +1254,10 @@ void cufftbench(int cufftbench_s, int cufftbench_e, int passes, int device_numbe
 				cutilSafeCall(cudaEventRecord(start, 0));
 				for (i = 0; i < 50; i++) {
 					cufftSafeCall(cufftExecZ2Z(plan, (cufftDoubleComplex *) g_x, (cufftDoubleComplex *) g_x, CUFFT_INVERSE));
-					square <<< n / (4 * threads[t2]), threads[t2] >>> (n, g_x, g_ct);
+					cudaAcc_square(threads[t2], n, g_x, g_ct);
 					cufftSafeCall(cufftExecZ2Z(plan, (cufftDoubleComplex *) g_x, (cufftDoubleComplex *) g_x, CUFFT_INVERSE));
-					norm1a<0> <<< n / (2 * threads[t1]), threads[t1] >>> (g_x, g_datai, g_xint, g_ttmp, g_carryi, g_err, maxerr);
-					norm2a<0> <<< (n / (2 * threads[t1]) + threads[t3] - 1) / threads[t3], threads[t3] >>> (g_x, g_xint, n, threads[t1], g_datai, g_carryi, g_ttp1);
+					cudaAcc_norm1a(0, threads[t1], n, g_x, g_datai, g_xint, g_ttmp, g_carryi, g_err, maxerr);
+					cudaAcc_norm2a(0, threads[t1], threads[t3], g_x, g_xint, n, g_datai, g_carryi, g_ttp1);
 				}
 				cutilSafeCall(cudaEventRecord(stop, 0));
 				cutilSafeCall(cudaEventSynchronize(stop));
@@ -2629,7 +1788,7 @@ int stage2_init_param3(int e, int n, int trans, float *err) {
 			cufftSafeCall(
 					cufftExecZ2Z(plan, (cufftDoubleComplex *) &e_data[2 * i * n], (cufftDoubleComplex *) &e_data[2 * i * n],
 							CUFFT_INVERSE));
-			copy_kernel<<<n / (2*threads1), threads1>>>(&e_data[(2 * i - 1) * n], &e_data[2 * i * n]);
+			cudaAcc_copy(n, threads1, &e_data[(2 * i - 1) * n], &e_data[2 * i * n]);
 			trans++;
 		}
 	}
@@ -2741,7 +1900,7 @@ int stage2_init_param4(int num, int cur_rp, int base, int e, int n, uint8 *gaps,
 		rp += 2 * gaps[j];
 	}
 	trans = stage2_init_param1(rp, 1, e, n, trans, err);
-	copy_kernel<<<n / (2*threads1), threads1>>>(&rp_data[0], &e_data[0]);
+	cudaAcc_copy(n, threads1, &rp_data[0], &e_data[0]);
 	k = rp + 2;
 	for (i = 1; i < num; i++) {
 		j++;
@@ -2751,7 +1910,7 @@ int stage2_init_param4(int num, int cur_rp, int base, int e, int n, uint8 *gaps,
 			cutilSafeThreadSync();
 			k += 2;
 		}
-		copy_kernel<<<n / (2*threads1), threads1>>>(&rp_data[i * n], &e_data[0]);
+		cudaAcc_copy(n, threads1, &rp_data[i * n], &e_data[0]);
 		
 	}
 	
@@ -3163,12 +2322,12 @@ int stage2(int *x_int, unsigned *x_packed, int q, int n, int nrp, float err) {
 	do {
 		printf("Processing %d - %d of %d relative primes.\n", m + 1, m + nrp, rpt);
 		printf("Inititalizing pass... ");
-		apply_weights <<<n / (2 * threads1), threads1>>> (g_x, &g_xint[0], g_ttmp);
+		cudaAcc_apply_weights(n, threads1, g_x, &g_xint[0], g_ttmp);
 		E_pre_mul(g_x, g_x, n, 1);
 		num_tran = stage2_init_param4(nrp, m, d, e, n, rp_gaps, num_tran, &err);
 		temp_tran = num_tran;
 		num_tran = stage2_init_param1(k, d, e, n, num_tran, &err);
-		apply_weights <<<n / (2 * threads1), threads1>>> (g_x, &g_xint[n], g_ttmp);
+		cudaAcc_apply_weights(n, threads1, g_x, &g_xint[n], g_ttmp);
 		temp_tran = num_tran - temp_tran;
 		itran_done += num_tran;
 		if ((m > 0 || k > ks) && fp) {
