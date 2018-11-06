@@ -46,7 +46,7 @@ DEBUG_LDFLAGS = $(COMMON_LDFLAGS) -fPIC
 
 CUDA_SRCS = $(wildcard cuda/*.cu)
 CUDA_OBJS = $(patsubst %.cu,%.o, $(CUDA_SRCS))
-OBJS = parse.o rho.o CUDAPm1.o
+OBJS = parse.o rho.o lucas.o CUDAPm1.o
 
 debug: NVCC_CFLAGS = $(NVCC_DEBUG_CFLAGS)
 debug: CFLAGS = $(DEBUG_CFLAGS)
@@ -56,6 +56,9 @@ all: $(BIN)
 
 $(BIN) $(DEBUG_BIN): $(OBJS) $(CUDA_OBJS)
 	$(CXX) $^ $(CFLAGS) $(LDFLAGS) $(LIBS) -o $@
+
+lucas.o: lucas.cu lucas.h CUDAPm1.h parse.h
+	$(NVCC) $(NVCC_CFLAGS) -c $<
 
 CUDAPm1.o: CUDAPm1.cu parse.h cuda/cuda_functions.h cuda/cuda_safecalls.h rho.h CUDAPm1.h
 	$(NVCC) $(NVCC_CFLAGS) -c $<

@@ -17,6 +17,11 @@
  along with mfaktc.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef _PARSE_H
+#define _PARSE_H
+
+#include <stdio.h>
+
 enum ASSIGNMENT_ERRORS {
 	NEVER_ASSIGNED = -1,
 	OK = 0,
@@ -43,6 +48,7 @@ extern "C" int file_exists(char* filename);  // nonzero if file exists
 extern "C" FILE* fopen_and_lock(const char *path, const char *mode);
 extern "C" int unlock_and_fclose(FILE* f);
 extern "C" int isprime(unsigned int n);
+extern "C" void remove_spaces (char* str_trimmed, const char* str_untrimmed);
 
 #ifndef _MSC_VER
 #include <sys/time.h>
@@ -54,3 +60,5 @@ typedef struct timeval {
 } timeval;
 extern "C" int gettimeofday (struct timeval *tv, struct timezone *);
 #endif
+
+#endif /* _PARSE_H */

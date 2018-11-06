@@ -1,5 +1,8 @@
 /* This contains selected functions from CUDA SDK 4.0.17 */
 
+#ifndef _CUDA_SAFECALLS_H
+#define _CUDA_SAFECALLS_H
+
 #include <stdio.h>
 
 inline cudaError cutilDeviceSynchronize()
@@ -86,3 +89,5 @@ inline void __cufftSafeCall( cufftResult err, const char *file, const int line) 
 	}
 }
 #endif
+
+#endif /* _CUDA_SAFECALLS_H */

@@ -927,3 +927,14 @@ int unlock_and_fclose(FILE *f) {
 #endif
 	return ret;
 }
+
+void remove_spaces (char* str_trimmed, const char* str_untrimmed) {
+	while (*str_untrimmed != '\0') {
+		if(!isspace(*str_untrimmed)) {
+			*str_trimmed = *str_untrimmed;
+			str_trimmed++;
+		}
+		str_untrimmed++;
+	}
+	*str_trimmed = '\0';
+}
