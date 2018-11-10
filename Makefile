@@ -30,7 +30,7 @@ NVCC_ARCHES += -gencode arch=compute_75,code=compute_75
 # Use --ptxas-options -v to see register usage
 # Use --maxrregcount to specify register usage
 
-NVCC_COMMON_CFLAGS = -use_fast_math --ptxas-options="-dlcm=cg -v" --maxrregcount=31 $(NVCC_ARCHES) $(COMMON_INCLUDES) $(COMMON_DEFINES)
+NVCC_COMMON_CFLAGS = -use_fast_math --resource-usage --maxrregcount=32 $(NVCC_ARCHES) $(COMMON_INCLUDES) $(COMMON_DEFINES)
 
 NVCC_CFLAGS = $(NVCC_COMMON_CFLAGS) $(OPTLEVEL) --compiler-options="$(CFLAGS) -fno-strict-aliasing"
 NVCC_DEBUG_CFLAGS = $(NVCC_COMMON_CFLAGS) -g -O0 --compiler-options="$(DEBUG_CFLAGS) -fno-strict-aliasing"
