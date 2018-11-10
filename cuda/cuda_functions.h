@@ -32,7 +32,7 @@ void cudaAcc_mult2(int threads, int n, double *g_out, double *a, double *b, doub
 void cudaAcc_mult3(int threads, int n, double *g_out, double *a, double *b, double *ct);
 void cudaAcc_sub_mul(int threads, int n, double *g_out, double *a, double *b1, double *b2, double *ct);
 void cudaAcc_pre_mul(int threads, int n, double *a, double *ct);
-void cudaAcc_norm1a(int g_err_flag, int threads, int n, double *g_in, int *g_data, int *g_xint, double *g_ttmp, int *g_carry, volatile float *g_err, float maxerr);
+void cudaAcc_norm1a(int g_err_flag, int bench, int threads, int n, double *g_in, int *g_data, int *g_xint, double *g_ttmp, int *g_carry, volatile float *g_err, float maxerr);
 void cudaAcc_norm1b(int g_err_flag, int threads, int n, double *g_in, long long int *g_data, int *g_xint, double *g_ttmp, long long int *g_carry, volatile float *g_err, float maxerr);
 void cudaAcc_norm2a(int g_err_flag, int threads1, int threads3, double *g_x, int *g_xint, int g_N, int *g_data, int *g_carry, double *g_ttp1);
 void cudaAcc_norm2b(int g_err_flag, int threads1, int threads3, double *g_x, int *g_xint, int g_N, long long int *g_data, long long int *g_carry, double *g_ttp1);

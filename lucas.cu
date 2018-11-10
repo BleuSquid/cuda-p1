@@ -55,7 +55,7 @@ float lucas_square(/*double *x,*/int q, int n, int iter, int last, float* maxerr
 
 	if (chkpt) {
 		if (!bit) {
-			cudaAcc_norm1a(1, threads1, n, g_x, g_datai, g_xint, g_ttmp, g_carryi, g_err, *maxerr);
+			cudaAcc_norm1a(1, 0, threads1, n, g_x, g_datai, g_xint, g_ttmp, g_carryi, g_err, *maxerr);
 			cudaAcc_norm2a(1, threads1, threads3, g_x, g_xint, n, g_datai, g_carryi, g_ttp1);
 		} else {
 			cudaAcc_norm1b(1, threads1, n, g_x, g_datal, g_xint, g_ttmp, g_carryl, g_err, *maxerr);
@@ -63,7 +63,7 @@ float lucas_square(/*double *x,*/int q, int n, int iter, int last, float* maxerr
 		}
 	} else {
 		if (!bit) {
-			cudaAcc_norm1a(0, threads1, n, g_x, g_datai, g_xint, g_ttmp, g_carryi, g_err, *maxerr);
+			cudaAcc_norm1a(0, 0, threads1, n, g_x, g_datai, g_xint, g_ttmp, g_carryi, g_err, *maxerr);
 			cudaAcc_norm2a(0, threads1, threads3, g_x, g_xint, n, g_datai, g_carryi, g_ttp1);
 		} else {
 			cudaAcc_norm1b(0, threads1, n, g_x, g_datal, g_xint, g_ttmp, g_carryl, g_err, *maxerr);

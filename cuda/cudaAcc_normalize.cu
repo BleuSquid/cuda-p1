@@ -1,6 +1,6 @@
 #include "cuda_functions.h"
 
-template <int g_err_flag>
+template <int g_err_flag, int bench>
 __global__ void norm1a_kernel(double *g_in, int *g_data, int *g_xint, double *g_ttmp, int *g_carry, volatile float *g_err, float maxerr) {
 	long long int bigint[2];
 	int val[2], numbits[2] = {g_qn[0], g_qn[0]}, mask[2], shifted_carry, carry_tmp, err_tmp;
@@ -39,8 +39,11 @@ __global__ void norm1a_kernel(double *g_in, int *g_data, int *g_xint, double *g_
 
 	err_tmp = __float_as_int(ferr[0]);
 
-	if (ferr[0] > maxerr)
-		atomicMax((int*) g_err, err_tmp);
+	if (!bench) {
+		if (ferr[0] > maxerr)
+			atomicMax((int*) g_err, err_tmp);
+	}
+
 	val[1] = ((int) bigint[1]) & ~mask[1];
 	carry[threadIdx.x + 1] = (int) (bigint[1] >> numbits[1]);
 	__syncthreads();
@@ -263,11 +266,13 @@ void set_ttp_inc(double *h_ttp_inc) {
 }
 
 
-void cudaAcc_norm1a(int g_err_flag, int threads, int n, double *g_in, int *g_data, int *g_xint, double *g_ttmp, int *g_carry, volatile float *g_err, float maxerr) {
-	if (g_err_flag)
-		norm1a_kernel<1><<<n / (2 * threads), threads >>>(g_in, g_data, g_xint, g_ttmp, g_carry, g_err, maxerr);
+void cudaAcc_norm1a(int g_err_flag, int bench, int threads, int n, double *g_in, int *g_data, int *g_xint, double *g_ttmp, int *g_carry, volatile float *g_err, float maxerr) {
+	if (bench)
+		norm1a_kernel<0,1><<<n / (2 * threads), threads >>>(g_in, g_data, g_xint, g_ttmp, g_carry, g_err, maxerr);
+	else if (g_err_flag)
+		norm1a_kernel<1,0><<<n / (2 * threads), threads >>>(g_in, g_data, g_xint, g_ttmp, g_carry, g_err, maxerr);
 	else
-		norm1a_kernel<0><<<n / (2 * threads), threads >>>(g_in, g_data, g_xint, g_ttmp, g_carry, g_err, maxerr);
+		norm1a_kernel<0,0><<<n / (2 * threads), threads >>>(g_in, g_data, g_xint, g_ttmp, g_carry, g_err, maxerr);
 }
 
 void cudaAcc_norm1b(int g_err_flag, int threads, int n, double *g_in, long long int *g_data, int *g_xint, double *g_ttmp, long long int *g_carry, volatile float *g_err, float maxerr) {
