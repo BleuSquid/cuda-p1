@@ -52,7 +52,7 @@ debug: NVCC_CFLAGS = $(NVCC_DEBUG_CFLAGS)
 debug: CFLAGS = $(DEBUG_CFLAGS)
 debug: LDFLAGS = $(DEBUG_LDFLAGS)
 
-all: $(BIN)
+all: $(BIN) test
 
 $(BIN) $(DEBUG_BIN): $(OBJS) $(CUDA_OBJS)
 	$(CXX) $^ $(CFLAGS) $(LDFLAGS) $(LIBS) -o $@
@@ -75,17 +75,19 @@ clean: clean-test
 
 debug: $(DEBUG_BIN)
 
-test: test-b1 test-b2
+test:
+	@$(MAKE) -j1 test-b1 test-b2
 
 test-b1: $(BIN) clean-test
-	./$(BIN) -noinfo 968819 -b1 20000
+	@env echo -en "Testing B-1... "
+	@./$(BIN) -noinfo 968819 -b1 20000 | grep -q 156948679 && env echo -e "\033[1;32mPass\033[0m" || env echo -e "\033[0;97;41mFail\033[0m"
 
 test-b2: $(BIN) clean-test
-	./$(BIN) -noinfo 7990427 -b1 983 -b2 124000
+	@env echo -en "Testing B-2... "
+	@./$(BIN) -noinfo 7990427 -b1 983 -b2 124000 | grep -q 10509037975912491881 && env echo -e "\033[1;32mPass\033[0m" || env echo -e "\033[0;97;41mFail\033[0m"
 
 clean-test:
 	rm -f *968819* *7990427* results.txt
-
 
 help:
 	@echo "\n\"make\"           builds CUDAPm1"
