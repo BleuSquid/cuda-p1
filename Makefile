@@ -75,11 +75,16 @@ cuda/%.o: cuda/%.cu cuda/complex_math.h cuda/cuda_functions.h
 clean: clean-test
 	rm -f *.o *~ $(OBJS) $(CUDA_OBJS)
 	rm -f $(BIN) $(DEBUG_BIN)
+	-rm test-stamp
 
 debug: $(DEBUG_BIN)
 
-test:
+test: $(BIN)
+	@$(MAKE) -j1 test-stamp
+
+test-stamp: $(BIN)
 	@$(MAKE) -j1 test-b1 test-b2
+	touch test-stamp
 
 test-b1: $(BIN) clean-test
 	@env echo -en "Testing B-1... "
