@@ -29,13 +29,14 @@ void init_threads(int n) {
 	} else
 		no_file = 1;
 	if (no_file || no_entry) {
-		if (no_file)
-			printf("No %s file found. Using default thread sizes.\n", threadfile);
-		else if (no_entry)
-			printf("No entry for fft = %dk found. Using default thread sizes.\n", n / 1024);
-		printf("For optimal thread selection, please run\n");
-		printf("./CUDAPm1 -cufftbench %d %d r\n", n / 1024, n / 1024);
-		printf("for some small r, 0 < r < 6 e.g.\n");
+		if (no_file) {
+			printf("No %s file found. Running benchmark.\n", threadfile);
+			threadbench(n/1024, 15, device_number);
+		}
+		else if (no_entry) {
+			printf("No entry for fft = %dk found. Running benchmark.\n", n / 1024);
+			threadbench(n/1024, 15, device_number);
+		}
 		fflush (NULL);
 	}
 	return;

@@ -47,7 +47,7 @@ double *rp_data;
 int *g_xint;
 
 char *size;
-int threads1, threads2 = 128, threads3 = 128;
+int threads1, threads2 = 128, threads3 = 128, device_number;
 float *g_err, g_max_err = 0.0f;
 int *g_datai, *g_carryi;
 long long int *g_datal, *g_carryl;
@@ -2458,7 +2458,8 @@ int main(int argc, char *argv[]) {
 	
 	/* "Production" opts to be read in from command line or ini file */
 	int q = -1;
-	int device_number = -1, f_f = 0;
+	int f_f = 0;
+	device_number = -1;
 	checkpoint_iter = -1;
 	threads1 = -1;
 	fftlen = -1;
