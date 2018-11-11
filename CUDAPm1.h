@@ -26,6 +26,5 @@ extern int device_number;
 
 void unpack_bits_int(int *x_int, unsigned *packed_x, int q, int n);
 void balance_digits_int(int* x, int q, int n);
-void threadbench(int n, int passes, int device_number);
 
 #endif /* CUDAPM1_H_ */

@@ -1,5 +1,6 @@
 #include "parse.h"
 #include "CUDAPm1.h"
+#include "bench.h"
 #include "cuda/cuda_safecalls.h"
 #include "cuda/cuda_functions.h"
 
