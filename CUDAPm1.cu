@@ -2171,7 +2171,7 @@ int main(int argc, char *argv[]) {
 #define K_F_DFLT 0
 #define D_F_DFLT 0
 #define POLITE_DFLT 1
-#define UNMEM_DFLT 100;
+#define UNUSEDMEM_DFLT 100
 #define WORKFILE_DFLT "worktodo.txt"
 #define RESULTSFILE_DFLT "results.txt"
 	
@@ -2224,8 +2224,8 @@ int main(int argc, char *argv[]) {
 			fprintf(stderr, "Warning: Couldn't parse ini file option ResultsFile; using default \"%s\"\n", RESULTSFILE_DFLT);
 		if (fftlen < 0 && !IniGetStr(INIFILE, "FFTLength", fft_str, "\0"))
 			/*fprintf(stderr, "Warning: Couldn't parse ini file option FFTLength; using autoselect.\n")*/;
-		if (unused_mem < 0 && !IniGetInt(INIFILE, "UnusedMem", &unused_mem, 100))
-			printf("Warning: Couldn't parse ini file option UnusedMem; using default.\n");
+		if (unused_mem < 0 && !IniGetInt(INIFILE, "UnusedMem", &unused_mem, UNUSEDMEM_DFLT))
+			printf("Warning: Couldn't find or parse ini file option UnusedMem; using default %dMiB.\n", UNUSEDMEM_DFLT);
 	} else  // no ini file
 	{
 		fprintf(stderr, "Warning: Couldn't find .ini file. Using defaults for non-specified options.\n");
@@ -2248,7 +2248,7 @@ int main(int argc, char *argv[]) {
 		if (polite < 0)
 			polite = POLITE_DFLT;
 		if (unused_mem < 0)
-			unused_mem = UNMEM_DFLT
+			unused_mem = UNUSEDMEM_DFLT
 		;
 		if (!input_filename[0])
 			sprintf(input_filename, WORKFILE_DFLT);
