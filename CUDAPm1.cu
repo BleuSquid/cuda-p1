@@ -2161,6 +2161,17 @@ int check_pm1(int q, char *expectedResidue) {
 	return (0);
 }
 
+int dir_exists(const char *path) {
+	struct stat info;
+
+	if(stat( path, &info ) != 0)
+		return 0;
+	else if(info.st_mode & S_IFDIR)
+		return 1;
+	else
+		return 0;
+}
+
 void parse_args(int argc, char *argv[], int* q, int* device_numer, int* cufftbench_s, int* cufftbench_e, int* cufftbench_d);
 /* The rest of the opts are global */
 int main(int argc, char *argv[]) {
@@ -2282,16 +2293,17 @@ int main(int argc, char *argv[]) {
 		cufftbench(cufftbench_s, cufftbench_e, cufftbench_d, device_number);
 	else {
 		if (s_f) {
+			if (!dir_exists(folder)) {
 #ifndef _MSC_VER
-			mode_t mode = S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
-			if (mkdir(folder, mode) != 0)
-				fprintf(stderr, "mkdir: cannot create directory `%s': File exists\n", folder);
+				mode_t mode = S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
+				if (mkdir(folder, mode) != 0) {
 #else
-			if (_mkdir (folder) != 0)
-			fprintf (stderr,
-					"mkdir: cannot create directory `%s': File exists\n",
-					folder);
+				if (_mkdir (folder) != 0) {
 #endif
+					fprintf (stderr, "mkdir: cannot create directory `%s': aborting\n", folder);
+					exit(EXIT_FAILURE);
+				}
+			}
 		}
 		if (q <= 0) {
 			int error;
