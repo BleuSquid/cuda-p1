@@ -1790,7 +1790,7 @@ int stage2(int *x_int, unsigned *x_packed, int q, int n, int nrp, float err) {
 	gettimeofday(&time0, NULL);
 	do {
 		printf("Processing %d - %d of %d relative primes.\n", m + 1, m + nrp, rpt);
-		printf("Inititalizing pass... ");
+		printf("Initializing pass... ");
 		cudaAcc_apply_weights(n, threads1, g_x, &g_xint[0], g_ttmp);
 		E_pre_mul(g_x, g_x, n, 1);
 		num_tran = stage2_init_param4(nrp, m, d, e, n, rp_gaps, num_tran, &err);
