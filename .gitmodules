@@ -1,0 +1,3 @@
+[submodule "src/mpir"]
+	path = src/mpir
+	url = https://github.com/BrianGladman/mpir.git
