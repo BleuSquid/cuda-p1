@@ -617,19 +617,19 @@ enum ASSIGNMENT_ERRORS get_next_assignment(char *filename, int *exponent, int* f
 		fprintf(stderr, "Warning: ignoring line %u: \"%s\" in \"%s\". Reason: ", linecount, line, filename);
 		switch (value) {
 			case LONG_LINE:
-				printf("line is too long.\n");
+				fprintf(stderr, "line is too long.\n");
 				break;
 			case NO_TEST_EQUAL:
-				printf("doesn't begin with Test= or DoubleCheck=.\n");
+				fprintf(stderr, "doesn't begin with Test= or DoubleCheck=.\n");
 				break;
 			case INVALID_FORMAT:
-				printf("invalid format.\n");
+				fprintf(stderr, "invalid format.\n");
 				break;
 			case INVALID_DATA:
-				printf("invalid data.\n");
+				fprintf(stderr, "invalid data.\n");
 				break;
 			default:
-				printf("unknown error.\n");
+				fprintf(stderr, "unknown error.\n");
 				break;
 		}
 		
