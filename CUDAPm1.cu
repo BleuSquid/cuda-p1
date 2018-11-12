@@ -2024,8 +2024,8 @@ int check_pm1(int q, char *expectedResidue) {
 			fflush (stdout);
 		}
 		
-		if (g_b2 > 1000000000)
-			printf("WARNING:  Expected failure with B2 > 1000000000!\n");  //max B2 supported?
+		if (g_b2 > MAX_B2)
+			printf("WARNING:  Expected failure with B2 > %d!\n", MAX_B2);  //max B2 supported?
 		fflush (stdout);
 		
 		if (stage == 1) {
