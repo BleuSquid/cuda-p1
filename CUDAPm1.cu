@@ -1,6 +1,9 @@
 char program[] = "CUDAPm1 v0.21";
-/* CUDALucas.c
- Shoichiro Yamada Oct. 2010
+/* CUDAPM1
+   created by owftheevil
+
+   derived from CUDALucas.c
+   Shoichiro Yamada Oct. 2010
 
  This is an adaptation of Richard Crandall lucdwt.c, John Sweeney MacLucasUNIX.c,
  and Guillermo Ballester Valor MacLucasFFTW.c code.
@@ -1074,14 +1077,14 @@ int vals, int *bound1, int *bound2, double *success_rate) {
 
 		for (guess_B2 = guess_B1; guess_B2 <= guess_B1 * 100; guess_B2 += guess_B1 >> 2) {
 			
-			/* Compute how many squarings will be required in pass 2.  In the */
-			/* low-memory cases, assume choose_pminus1_plan will pick D = 210, E = 1 */
-			/* If more memory is available assume choose_pminus1_plan will pick */
-			/* D = 2310, E = 2.  This will provide an accurate enough cost for our */
-			/* purposes even if different D and E values are picked.  See */
-			/* choose_pminus1_plan for a description of the costs of P-1 stage 2. */
+			/* Compute how many squarings will be required in pass 2.  In the
+			   low-memory cases, assume choose_pminus1_plan will pick D = 210, E = 1
+			   If more memory is available assume choose_pminus1_plan will pick
+			   D = 2310, E = 2.  This will provide an accurate enough cost for our
+			   purposes even if different D and E values are picked.  See
+			   choose_pminus1_plan for a description of the costs of P-1 stage 2.
 
-			/* For cudapm1, we're not set up for e = 1, assume e = 2 in both cases*/
+			   For cudapm1, we're not set up for e = 1, assume e = 2 in both cases */
 
 			logB2 = log((double) guess_B2);
 			numprimes = (unsigned long) (guess_B2 / (logB2 - 1.0) - guess_B1 / (logB1 - 1.0));
@@ -1182,7 +1185,7 @@ int vals, int *bound1, int *bound2, double *success_rate) {
 			continue;
 		}
 		
-		/* Is this the best B1 thusfar? */
+		/* Is this the best B1 thus far? */
 
 		if (guess_B1 == 10000
 				|| 1.15 * best[0].prob * ll_tests * guess_exp - (pass1_squarings + best[0].pass2_squarings)

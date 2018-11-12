@@ -50,6 +50,17 @@ extern "C" int unlock_and_fclose(FILE* f);
 extern "C" int isprime(unsigned int n);
 extern "C" void remove_spaces (char* str_trimmed, const char* str_untrimmed);
 
+
+/* In order to have the gettimeofday() function, you need
+ * these includes on Linux:
+ * 	#include <sys/time.h>
+ * 	#include <unistd.h>
+ * On Windows, you need
+ * 	#include <winsock2.h>
+ * and a definition for
+ * 	int gettimeofday (struct timeval *tv, struct timezone) {}
+ */
+
 #ifndef _MSC_VER
 #include <sys/time.h>
 #include <unistd.h>
