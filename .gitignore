@@ -2,6 +2,11 @@
 results.txt
 worktodo.txt
 
+# build artifacts
+test-stamp
+*_fft.txt
+*_threads.txt
+
 # Final Binary
 CUDAPm1
 
