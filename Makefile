@@ -13,7 +13,7 @@ CXX = g++
 CC = gcc
 NVCC = nvcc
 
-CFLAGS = $(OPTLEVEL) $(COMMON_INCLUDES) $(COMMON_DEFINES) -Wall
+CFLAGS = $(OPTLEVEL) $(COMMON_INCLUDES) $(COMMON_DEFINES) -Wall -fPIC
 DEBUG_CFLAGS = -g -O0 $(COMMON_INCLUDES) $(COMMON_DEFINES)
 
 # Configure this line to specify which cuda architectures (compute capability) to target
@@ -40,7 +40,7 @@ NVCC_DEBUG_CFLAGS = $(NVCC_COMMON_CFLAGS) -g -O0 --compiler-options="$(DEBUG_CFL
 # follow their defaults, the necessary files will be installed in your PATH and
 # LDPATH. Otherwise, you'll need to manually insert their paths here.
 
-LIBS = -lcufft -lcudart -lm -lgmp
+LIBS = -lcufft -lcudart -lm src/mpir/.libs/libmpir.a src/mpir/.libs/libgmp.a
 LDFLAGS = $(COMMON_LDFLAGS) -fPIC -Wl,-O1 -Wl,--as-needed -Wl,--sort-common -Wl,--relax
 DEBUG_LDFLAGS = $(COMMON_LDFLAGS) -fPIC
 
@@ -48,11 +48,27 @@ CUDA_SRCS = $(wildcard cuda/*.cu)
 CUDA_OBJS = $(patsubst %.cu,%.o, $(CUDA_SRCS))
 OBJS = parse.o rho.o lucas.o bench.o CUDAPm1.o
 
+SUBMODULES = mpir
+
 debug: NVCC_CFLAGS = $(NVCC_DEBUG_CFLAGS)
 debug: CFLAGS = $(DEBUG_CFLAGS)
 debug: LDFLAGS = $(DEBUG_LDFLAGS)
 
-all: $(BIN) test
+all:
+	$(MAKE) $(SUBMODULES)
+	$(MAKE) $(BIN)
+	$(MAKE) -j1 test
+
+src/mpir/configure:
+	cd src/mpir && ./autogen.sh
+
+src/mpir/Makefile: src/mpir/configure
+	cd src/mpir && ./configure --disable-shared --enable-static --enable-gmpcompat CFLAGS="-fPIC"
+
+src/mpir/.libs/libmpir.la: src/mpir/Makefile
+	cd src/mpir && $(MAKE)
+
+mpir: src/mpir/.libs/libmpir.la
 
 $(BIN) $(DEBUG_BIN): $(OBJS) $(CUDA_OBJS)
 	$(CXX) $^ $(CFLAGS) $(LDFLAGS) $(LIBS) -o $@
@@ -76,6 +92,7 @@ clean: clean-test
 	rm -f *.o *~ $(OBJS) $(CUDA_OBJS)
 	rm -f $(BIN) $(DEBUG_BIN)
 	-rm test-stamp
+	-cd src/mpir && make distclean
 
 debug: $(DEBUG_BIN)
 
@@ -105,3 +122,9 @@ help:
 	@echo "\"make test-b1\"   tests a factor found via a small b1"
 	@echo "\"make test-b2\"   tests a factor found via a small b2"
 	@echo "\"make test\"      run both tests"
+
+.PHONY: clean help mpir debug test test-b1 test-b2 clean-test
+
+
+
+
