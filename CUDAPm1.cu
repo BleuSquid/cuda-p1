@@ -17,7 +17,7 @@ char program[] = "CUDAPm1 v0.21";
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <gmp.h>
+#include "src/mpir/gmp.h"
 #include <math.h>
 #include <assert.h>
 #include <time.h>

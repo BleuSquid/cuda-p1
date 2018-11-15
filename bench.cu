@@ -16,7 +16,7 @@ void threadbench(int n, int passes, int device_number) {
 	int threads[6] = {32, 64, 128, 256, 512, 1024};
 
 	/* I could just hard-code this value, but it's better to be safe */
-	int sizeofThreads = sizeof(threads)/sizeof(threads[0]);
+	const int sizeofThreads = sizeof(threads)/sizeof(threads[0]);
 
 	float total[sizeofThreads * sizeofThreads * sizeofThreads] = {0.0f};
 	float squareTime[sizeofThreads];
