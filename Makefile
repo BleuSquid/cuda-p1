@@ -73,13 +73,13 @@ mpir: src/mpir/.libs/libmpir.la
 $(BIN) $(DEBUG_BIN): $(OBJS) $(CUDA_OBJS)
 	$(CXX) $^ $(CFLAGS) $(LDFLAGS) $(LIBS) -o $@
 
-lucas.o: lucas.cu lucas.h CUDAPm1.h parse.h
+lucas.o: lucas.cu src/mpir/.libs/libmpir.la lucas.h CUDAPm1.h parse.h
 	$(NVCC) $(NVCC_CFLAGS) -c $<
 
-bench.o: bench.cu bench.h CUDAPm1.h
+bench.o: bench.cu src/mpir/.libs/libmpir.la bench.h CUDAPm1.h
 	$(NVCC) $(NVCC_CFLAGS) -c $<
 
-CUDAPm1.o: CUDAPm1.cu parse.h cuda/cuda_functions.h cuda/cuda_safecalls.h rho.h CUDAPm1.h
+CUDAPm1.o: CUDAPm1.cu src/mpir/.libs/libmpir.la parse.h cuda/cuda_functions.h cuda/cuda_safecalls.h rho.h CUDAPm1.h
 	$(NVCC) $(NVCC_CFLAGS) -c $<
 
 cuda/%.o: cuda/%.cu cuda/complex_math.h cuda/cuda_functions.h
