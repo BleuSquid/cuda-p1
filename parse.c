@@ -70,6 +70,8 @@
 #include <unistd.h>
 #include <sched.h>
 #define MODE S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH
+
+#include "parse.h"
 static void Sleep(unsigned int ms) {
 	struct timespec ts;
 	ts.tv_sec = (time_t) ms / 1000;
@@ -200,47 +202,6 @@ int valid_assignment(int exp, int fftlen)
 	return ret;
 }
 
-enum ASSIGNMENT_ERRORS {
-	NEVER_ASSIGNED = -1,
-	OK = 0,
-	CANT_OPEN_FILE = 1,
-	VALID_ASSIGNMENT_NOT_FOUND = 2,
-	CANT_OPEN_WORKFILE = 3,
-	CANT_OPEN_TEMPFILE = 4,
-	ASSIGNMENT_NOT_FOUND = 5,
-	CANT_RENAME = 6
-};
-
-typedef char LINE_BUFFER[MAX_LINE_LENGTH + 1];
-
-enum PARSE_WARNINGS {
-	NO_WARNING = 0,
-	END_OF_FILE,
-	LONG_LINE,
-	NO_TEST_EQUAL,
-	INVALID_FORMAT,
-	INVALID_DATA,
-	BLANK_LINE,
-	NONBLANK_LINE
-};
-
-enum ASSIGNMENT_TYPE {
-	NONE,
-	PFACTOR,
-	PMINUS1
-};
-
-struct ASSIGNMENT {
-	enum ASSIGNMENT_TYPE type;
-	int exponent;
-	int fft_length;
-	int tf_depth;
-	int ll_saved;
-	int b1;
-	int b2;
-	char hex_key[MAX_LINE_LENGTH + 1];	// optional assignment key....
-	char comment[MAX_LINE_LENGTH + 1];	// optional comment -- it followed the assignment on the same line.
-};
 // Should we include FFT length in this?
 
 // note:  parse_worktodo_line() is a function that
