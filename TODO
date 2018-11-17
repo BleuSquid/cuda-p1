@@ -3,3 +3,5 @@ Modify and extend console/logging output capabilities
 
 Redo readme.txt
 - https://www.mersenneforum.org/showpost.php?p=499685&postcount=612
+
+Free VideoRAM while performing GCD, or start processing next stage in parallel
