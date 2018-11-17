@@ -46,7 +46,7 @@ DEBUG_LDFLAGS = $(COMMON_LDFLAGS) -fPIC
 
 CUDA_SRCS = $(wildcard cuda/*.cu)
 CUDA_OBJS = $(patsubst %.cu,%.o, $(CUDA_SRCS))
-OBJS = parse.o rho.o lucas.o bench.o CUDAPm1.o
+OBJS = parse.o rho.o lucas.o bench.o selftest.o CUDAPm1.o
 
 SUBMODULES = mpir
 
@@ -77,6 +77,9 @@ lucas.o: lucas.cu src/mpir/.libs/libmpir.la lucas.h CUDAPm1.h parse.h
 	$(NVCC) $(NVCC_CFLAGS) -c $<
 
 bench.o: bench.cu src/mpir/.libs/libmpir.la bench.h CUDAPm1.h
+	$(NVCC) $(NVCC_CFLAGS) -c $<
+
+selftest.o: selftest.cu CUDAPm1.h parse.h
 	$(NVCC) $(NVCC_CFLAGS) -c $<
 
 CUDAPm1.o: CUDAPm1.cu src/mpir/.libs/libmpir.la parse.h cuda/cuda_functions.h cuda/cuda_safecalls.h rho.h CUDAPm1.h
