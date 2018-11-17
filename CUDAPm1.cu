@@ -70,6 +70,7 @@ int g_e = 0;
 int g_nrp = 0;
 int g_eb1 = 0;
 int keep_s1 = 0;
+int selftest = 0;
 
 char folder[132];
 char input_filename[132], RESULTSFILE[132];
@@ -2382,6 +2383,8 @@ void parse_args(int argc, char *argv[], int* q, int* device_number, int* cufftbe
 			fprintf(stderr, "                       -b2         set b2\n\n");
 			fprintf(stderr, "                       -d2         Brent-Suyama coefficient (multiple of 30, 210, or 2310) \n\n");
 			fprintf(stderr, "                       -e2         Brent-Suyama exponent (2-12) \n\n");
+			fprintf(stderr, "                       -selftest   Run a quick selftest\n");
+			fprintf(stderr, "                       -selftest2  Run a longer selftest\n\n");
 //fprintf (stderr,  // Now an internal parameter
 //     "                       -nrp2       Relative primes per pass (divisor of 8, 48, or 480)\n\n");
 			exit(2);
@@ -2533,7 +2536,12 @@ void parse_args(int argc, char *argv[], int* q, int* device_number, int* cufftbe
 			g_eb1 = atoi(argv[2]);
 			argv += 2;
 			argc -= 2;
-		} else {
+/*		} else if (strcmp(argv[1], "-selftest") == 0) {
+			selftest = 1;
+			if (strcmp(argv[1], "-selftest2") == 0) {
+				selftest = 2;
+			}
+*/		} else {
 			if (*q != -1 || strcmp(input_filename, "") != 0) {
 				fprintf(stderr, "can't parse options\n\n");
 				exit(2);
