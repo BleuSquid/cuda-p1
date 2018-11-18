@@ -9,5 +9,7 @@ Building
 After checking out the main project, you also need to check out the
 subprojects (currently only MPIR)
 To do this, the following commands need to be run:
-> git submodule init
-> git submodule update
+```
+git submodule init
+git submodule update
+```
