@@ -1,4 +1,4 @@
-char program[] = "CUDAPm1 v0.21";
+char program[] = "CUDAPm1 v0.22";
 /* CUDAPM1
    created by owftheevil
 

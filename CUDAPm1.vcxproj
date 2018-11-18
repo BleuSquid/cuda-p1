@@ -12,6 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />
+    <None Include="changelog" />
     <None Include="CUDAPm1.ini" />
     <None Include="LICENSE" />
     <None Include="Makefile" />

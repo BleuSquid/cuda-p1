@@ -1,0 +1,24 @@
+cudapm1 (0.22);
+
+  * First proper release since forking
+    (Originally based on code from https://sourceforge.net/projects/cudapm1/ (r52)
+  * Compute Dickman's function live, instead of using incorrect precomputed values
+  * Fix memory leaks in stage2
+  * Fix fencepost error causing invalid results
+  * Fix potential overflows
+  * Use smaller data types when possible
+  * Reduce kernel branching
+  * Update build for CUDA 10.0 / Compute Capability 7.5
+  * Split kernel code into individual files
+  * Replace GMP with MPIR for easier cross-platform builds.
+  * Automatically run threadbench if required
+  * Add VS2017 and eclipse build files.
+  * Implement internal self-test system
+  * Allow full memory allocation on 64-bit windows builds
+  * Contributions from kriesel:
+     * Add test for known invalid residues
+	 * Comment & code formatting/cleanup
+	 * Add test for abnormally low threadbench timings
+	 * Add test for abnormally low fftbench timings
+
+-- Aaron Haviland <orion@parsed.net>  Sun, 18 Nov 2018 11:30:00 EST
