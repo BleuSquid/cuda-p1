@@ -2160,8 +2160,8 @@ int check_pm1(int q, char *expectedResidue) {
 				total_time += (time1.tv_sec - start_time);
 				printf("\nStage 1 complete, estimated total time = ");
 				print_time_from_seconds(stdout, total_time);
-				fflush(stdout);
 				printf("\nStarting stage 1 gcd.\n");
+				fflush(stdout);
 				st1_factor = get_gcd(/*x,*/x_packed, q, n, 1);
 			}
 			if (!st1_factor) {
@@ -2171,9 +2171,11 @@ int check_pm1(int q, char *expectedResidue) {
 				}
 				if (stage == 2) {
 					printf("Starting stage 2.\n");
+					fflush(stdout);
 					stage2(x_int, x_packed, q, n, nrp, maxerr);
 					if (!quitting) {
 						printf("Starting stage 2 gcd.\n");
+						fflush(stdout);
 						get_gcd(x_packed, q, n, 2);
 						rm_checkpoint(q, keep_s1);
 					}
