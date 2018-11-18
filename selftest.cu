@@ -34,11 +34,11 @@ int summarise_selftests(int mode) {
 	float eta = 0.0f;
 	unsigned int i;
 
-	if (mode == 1) {
-		for (i = 0; i < sizeof(fast_exponents) / sizeof(TEST_ASSIGNMENT); i++) {
-			eta += fast_exponents[i].eta;
-		}
-	} else if (mode ==2) {
+	for (i = 0; i < sizeof(fast_exponents) / sizeof(TEST_ASSIGNMENT); i++) {
+		eta += fast_exponents[i].eta;
+	}
+
+	if (mode ==2) {
 		for (i = 0; i < sizeof(slow_exponents) / sizeof(TEST_ASSIGNMENT); i++) {
 			eta += slow_exponents[i].eta;
 		}
