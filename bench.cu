@@ -20,7 +20,7 @@ void threadbench(int n, int passes, int device_number) {
 
 	float total[sizeofThreads * sizeofThreads * sizeofThreads] = {0.0f};
 	float squareTime[sizeofThreads];
-	int t1, t2, t3, i;
+	int t1, t2, t3, i, j;
 	float best_time = 10000.0f;
 	int best_t1 = 0, best_t2 = 0, best_t3 = 0;
 	int pass;
@@ -106,15 +106,51 @@ void threadbench(int n, int passes, int device_number) {
 		}
 	}
 
+	/* @@ above inner loop is a good place for cuda call error return checking to be added to perhaps detect failed calls
+	or the 1024-threads error on certain cards; it may impact benchmark performance but not actual usage performance. */
+
+	/* Detect abnormally low iteration times */
+
+	float averagetime=0.0f;
+	int thresholdwarncount=0;
+	float thresholdratio=0.75f;
+	if ( n / 1024 < 100 )
+		thresholdratio= 0.1f + 0.65f * n / 102400.0f; /* tapers from 0.1 to 0.8 linearly with n up to 100k, then flat at 0.75 */
+
+	j = 0;
+	for (i=0; i < 216; i++) {
+		if (total[i] > 0) {
+			averagetime += total[i];
+			j++;
+		}
+	}
+
+	averagetime=averagetime/float(j);
+	float thresholdtime=averagetime*thresholdratio;
+	printf("\nAverage time for fft= %dK, all threads variations %3.4f msec, threshold value for valid timings set to %1.4f of this, %3.4f msec\n",
+		n/1024, averagetime / passes, thresholdratio, thresholdtime / passes);
+
 	best_time = FLT_MAX;
+
 	for (i = 0; i < 216 && !quitting; i++) {
 		if (total[i] < best_time && total[i] > 0.0f) {
-			int j = i;
-			best_time = total[i];
-			best_t3 = j % 6;
-			j /= 6;
-			best_t1 = j / 6;
+			if (total[i] > thresholdtime) {
+				int j = i;
+				best_time = total[i];
+				best_t3 = j % 6;
+				j /= 6;
+				best_t1 = j / 6;
+			} else {
+				printf("Warning, time for fft = %dK, time: %3.4f msec, t1 = %d, t2 = %d, t3 = %d is below threshold %3.4f msec (%1.4f of average %3.4f)\n",
+					n / 1024, total[i] / passes, threads[i / 36], threads[best_t2], threads[i%6], thresholdtime / passes, thresholdratio, averagetime / passes);
+				thresholdwarncount++;
+			}
 		}
+	}
+
+	if (thresholdwarncount > 0) {
+		printf("Timings below threshold were detected for %d norm1 / mult / norm2 combinations for fft length %dK and omitted from consideration for best.\n",
+			thresholdwarncount, n / 1024);
 	}
 
 	printf("\nBest time for fft = %dK, time: %2.4f, t1 = %d, t2 = %d, t3 = %d\n", n / 1024, best_time / passes, threads[best_t1],
