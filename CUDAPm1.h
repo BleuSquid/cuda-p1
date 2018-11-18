@@ -5,6 +5,13 @@
 #include <cuda_runtime.h>
 #include <cufft.h>
 
+// Check Architecture
+#if _WIN64 || __x86_64__
+#define ENV64BIT
+#else
+#define ENV32BIT
+#endif
+
 int interact(void);
 #define RINT_x86(x) (floor(x+0.5))
 

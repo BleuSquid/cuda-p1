@@ -2019,9 +2019,9 @@ int check_pm1(int q, char *expectedResidue) {
 		g_d = g_d_commandline;
 		if (g_nrp == 0)
 			nrp = ((free_mem - (size_t) unused_mem * 1024 * 1024) / n / 8 - 7);
-#ifdef _MSC_VER
+#ifdef ENV32BIT
 		if (nrp > (4096/sizeof(double))*1024*1024/n)
-			nrp = (4096/sizeof(double))*1024*1024/n;  // Max single allocation of 4 GB on Windows?
+			nrp = (4096/sizeof(double))*1024*1024/n;  // Max single allocation of 4 GB on 32-bit architectures?
 #endif
 		if (nrp < 4)
 			nrp = 4;
@@ -2294,7 +2294,29 @@ int main(int argc, char *argv[]) {
 		if (!RESULTSFILE[0])
 			sprintf(RESULTSFILE, RESULTSFILE_DFLT);
 	}
-	
+
+#if defined(ENV64BIT)
+	if (sizeof(void*) != 8)
+	{
+		wprintf(L"ENV64BIT: Error: pointer should be 8 bytes. Exiting.");
+		exit(0);
+	}
+#ifdef EBUG
+	wprintf(L"Diagnostics: we are running in 64-bit mode.\n");
+#endif EBUG
+#elif defined (ENV32BIT)
+	if (sizeof(void*) != 4)
+	{
+		wprintf(L"ENV32BIT: Error: pointer should be 4 bytes. Exiting.");
+		exit(0);
+	}
+#ifdef EBUG
+	wprintf(L"Diagnostics: we are running in 32-bit mode.\n");
+#endif EBUG
+#else
+#error "Must define either ENV32BIT or ENV64BIT".
+#endif
+
 	if (fftlen < 0) {  // possible if -f not on command line
 		fftlen = fft_from_str(fft_str);
 	}
