@@ -62,6 +62,7 @@
 #include <time.h>
 
 #define MAX_LINE_LENGTH 131
+#include "parse.h"
 
 #ifndef _MSC_VER /* See next comment */
 #define _fopen fopen
@@ -79,8 +80,6 @@ static void Sleep(unsigned int ms) {
 }
 #else
 #include <io.h>
-
-#include "parse.h"
 
 #undef open
 #undef close
