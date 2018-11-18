@@ -57,7 +57,6 @@ debug: LDFLAGS = $(DEBUG_LDFLAGS)
 all:
 	$(MAKE) $(SUBMODULES)
 	$(MAKE) $(BIN)
-	$(MAKE) -j1 test
 
 src/mpir/configure:
 	cd src/mpir && ./autogen.sh
@@ -91,42 +90,20 @@ cuda/%.o: cuda/%.cu cuda/complex_math.h cuda/cuda_functions.h
 %.o: %.c %.h
 	$(CC) $(CFLAGS) -c $<
 
-clean: clean-test
+clean:
 	rm -f *.o *~ $(OBJS) $(CUDA_OBJS)
 	rm -f $(BIN) $(DEBUG_BIN)
-	-rm test-stamp
 	-cd src/mpir && make distclean
 
 debug: $(DEBUG_BIN)
-
-test: $(BIN)
-	@$(MAKE) -j1 test-stamp
-
-test-stamp: $(BIN)
-	@$(MAKE) -j1 test-b1 test-b2
-	touch test-stamp
-
-test-b1: $(BIN) clean-test
-	@env echo -en "Testing B-1... "
-	@./$(BIN) -noinfo 968819 -b1 20000 | grep -q 156948679 && env echo -e "\033[1;32mPass\033[0m" || env echo -e "\033[0;97;41mFail\033[0m"
-
-test-b2: $(BIN) clean-test
-	@env echo -en "Testing B-2... "
-	@./$(BIN) -noinfo 7990427 -b1 983 -b2 124000 | grep -q 10509037975912491881 && env echo -e "\033[1;32mPass\033[0m" || env echo -e "\033[0;97;41mFail\033[0m"
-
-clean-test:
-	rm -f *968819* *7990427* results.txt
 
 help:
 	@echo "\n\"make\"           builds CUDAPm1"
 	@echo "\"make clean\"     removes object files"
 	@echo "\"make debug\"     creates a debug build"
 	@echo "\"make help\"      prints this message"
-	@echo "\"make test-b1\"   tests a factor found via a small b1"
-	@echo "\"make test-b2\"   tests a factor found via a small b2"
-	@echo "\"make test\"      run both tests"
 
-.PHONY: clean help mpir debug test test-b1 test-b2 clean-test
+.PHONY: clean help mpir debug
 
 
 
