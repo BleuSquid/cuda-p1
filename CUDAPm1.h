@@ -21,6 +21,7 @@ extern double *g_ttmp, *g_ttp1;
 extern double *g_x, *g_ct;
 extern int *g_xint;
 
+extern int quitting;
 extern char *size;
 extern int threads1, threads2, threads3;
 extern float *g_err;

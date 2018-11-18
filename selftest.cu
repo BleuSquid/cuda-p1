@@ -79,7 +79,7 @@ void run_selftests(int mode) {
 	fprintf(stderr, "Entering selftest mode: %d\n", selftest);
 
 	/* run fast selftests first */
-	for (i = 0; i < sizeof(fast_exponents) / sizeof(TEST_ASSIGNMENT); i++) {
+	for (i = 0; i < sizeof(fast_exponents) / sizeof(TEST_ASSIGNMENT) && !quitting; i++) {
 		passfail += selftest_exponent(fast_exponents[i]);
 		if (st_result != fast_exponents[i].expected_result)
 			passfail++;
@@ -93,7 +93,7 @@ void run_selftests(int mode) {
 
 	if (mode == 2) {
 		/* run slow selftests second */
-		for (i = 0; i < sizeof(slow_exponents) / sizeof(TEST_ASSIGNMENT); i++) {
+		for (i = 0; i < sizeof(slow_exponents) / sizeof(TEST_ASSIGNMENT) && !quitting; i++) {
 			passfail += selftest_exponent(slow_exponents[i]);
 			if (st_result != slow_exponents[i].expected_result)
 				passfail++;

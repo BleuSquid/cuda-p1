@@ -833,7 +833,10 @@ void unpack_bits_int(int *x_int, unsigned *packed_x, int q, int n) {
 void SetQuitting(int sig) {
 	quitting = 1;
 	sig == SIGINT ? printf("\tSIGINT") : (sig == SIGTERM ? printf("\tSIGTERM") : printf("\tUnknown signal"));
-	printf(" caught, writing checkpoint.\n");
+	printf(" caught");
+	if (!selftest)
+		printf(", writing checkpoint");
+	printf(".\n");
 }
 
 #ifndef _MSC_VER

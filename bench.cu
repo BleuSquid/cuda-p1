@@ -46,11 +46,11 @@ void threadbench(int n, int passes, int device_number) {
 	cutilSafeCall(cudaEventCreateWithFlags(&stop, cudaEventBlockingSync));
 	cufftSafeCall(cufftPlan1d(&plan, n / 2, CUFFT_Z2Z, 1));
 
-	for (t2 = 0; t2 < sizeofThreads; t2++) {
+	for (t2 = 0; t2 < sizeofThreads && !quitting; t2++) {
 		/* bench cudaAcc_square threads */
 		squareTime[t2] = 0.0f;
 
-		for (pass = 1; pass <= passes+3; pass++) {
+		for (pass = 1; pass <= passes+3 && !quitting; pass++) {
 			cutilSafeCall(cudaEventRecord(start, 0));
 			for (i = 0; i < 100; i++) { /* 250 loops */
 				cudaAcc_square(threads[t2], n, g_x, g_ct);
@@ -67,7 +67,7 @@ void threadbench(int n, int passes, int device_number) {
 	}
 
 	best_time = FLT_MAX;
-	for (t2 = 0; t2 < sizeofThreads; t2++) {
+	for (t2 = 0; t2 < sizeofThreads && !quitting; t2++) {
 		if (squareTime[t2] < best_time && squareTime[t2] > 0.0f) {
 			best_time = squareTime[t2];
 			best_t2 = t2;
@@ -76,13 +76,13 @@ void threadbench(int n, int passes, int device_number) {
 
 	printf("\nBest square time for fft = %dK, time: %2.4f, t = %d\n\n", n / 1024, best_time / passes, threads[best_t2]);
 
-	for (t1 = 0; t1 < sizeofThreads - 1; t1++) {
+	for (t1 = 0; t1 < sizeofThreads - 1 && !quitting; t1++) {
 		/* bench norm1a/2a threads */
 		if (n / (2 * threads[t1]) <= dev.maxGridSize[0] && n % (2 * threads[t1]) == 0) {
-			for (t3 = 0; t3 < sizeofThreads; t3++) {
-				for (pass = 1; pass <= passes + 3; pass++) {
+			for (t3 = 0; t3 < sizeofThreads && !quitting; t3++) {
+				for (pass = 1; pass <= passes + 3 && !quitting; pass++) {
 					cutilSafeCall(cudaEventRecord(start, 0));
-					for (i = 0; i < 100; i++) {
+					for (i = 0; i < 100 && !quitting; i++) {
 						//cufftSafeCall(cufftExecZ2Z(plan, (cufftDoubleComplex *) g_x, (cufftDoubleComplex *) g_x, CUFFT_INVERSE));
 						//cudaAcc_square(threads[best_t2], n, g_x, g_ct);
 						//cufftSafeCall(cufftExecZ2Z(plan, (cufftDoubleComplex *) g_x, (cufftDoubleComplex *) g_x, CUFFT_INVERSE));
@@ -107,7 +107,7 @@ void threadbench(int n, int passes, int device_number) {
 	}
 
 	best_time = FLT_MAX;
-	for (i = 0; i < 216; i++) {
+	for (i = 0; i < 216 && !quitting; i++) {
 		if (total[i] < best_time && total[i] > 0.0f) {
 			int j = i;
 			best_time = total[i];
@@ -135,14 +135,15 @@ void threadbench(int n, int passes, int device_number) {
 	char devname[256];
 	remove_spaces(devname, dev.name);
 
-	sprintf(threadfile, "%s_threads.txt", devname);
-	FILE *fptr;
-	fptr = fopen(threadfile, "a+");
-	if (!fptr)
-		printf("Can't open %s_threads.txt\n", devname);
-	else
-		fprintf(fptr, "%5d %4d %4d %4d %8.4f\n", n / 1024, threads[best_t1], threads[best_t2], threads[best_t3], best_time / passes);
-
+	if (!quitting) {
+		sprintf(threadfile, "%s_threads.txt", devname);
+		FILE *fptr;
+		fptr = fopen(threadfile, "a+");
+		if (!fptr)
+			printf("Can't open %s_threads.txt\n", devname);
+		else
+			fprintf(fptr, "%5d %4d %4d %4d %8.4f\n", n / 1024, threads[best_t1], threads[best_t2], threads[best_t3], best_time / passes);
+	}
 }
 
 void cufftbench(int cufftbench_s, int cufftbench_e, int passes, int device_number) {
@@ -185,13 +186,13 @@ void cufftbench(int cufftbench_s, int cufftbench_e, int passes, int device_numbe
 	cutilSafeCall(cudaEventCreate(&start));
 	cutilSafeCall(cudaEventCreateWithFlags(&stop, cudaEventBlockingSync));
 
-	for (j = cufftbench_s; j <= cufftbench_e; j++) {
+	for (j = cufftbench_s; j <= cufftbench_e && !quitting; j++) {
 		if (isReasonable(j) < 15) {
 			int n = j * 1024;
 			cufftSafeCall(cufftPlan1d(&plan, n / 2, CUFFT_Z2Z, 1));
-			for (k = 0; k < passes; k++) {
+			for (k = 0; k < passes && !quitting; k++) {
 				cutilSafeCall(cudaEventRecord(start, 0));
-				for (i = 0; i < 50; i++) {
+				for (i = 0; i < 50 && !quitting; i++) {
 					cufftSafeCall(cufftExecZ2Z(plan, (cufftDoubleComplex *) g_x, (cufftDoubleComplex *) g_x, CUFFT_INVERSE));
 					cudaAcc_square(threads[t2], n, g_x, g_ct);
 					cufftSafeCall(cufftExecZ2Z(plan, (cufftDoubleComplex *) g_x, (cufftDoubleComplex *) g_x, CUFFT_INVERSE));
@@ -224,58 +225,62 @@ void cufftbench(int cufftbench_s, int cufftbench_e, int passes, int device_numbe
 
 	i = end - 1;
 	best_time = 10000.0f;
-	while (i >= 0) {
+	while (i >= 0 && !quitting) {
 		if (total[i] > 0.0f && total[i] < best_time)
 			best_time = total[i];
 		else
 			total[i] = 0.0f;
 		i--;
 	}
-	char fftfile[256];
-	char devname[256];
-	remove_spaces(devname, dev.name);
 
-	FILE *fptr;
+	if (!quitting) {
+		char fftfile[256];
+		char devname[256];
+		remove_spaces(devname, dev.name);
 
-	sprintf(fftfile, "%s_fft.txt", devname);
-	fptr = fopen(fftfile, "w");
-	if (!fptr) {
-		printf("Cannot open %s.\n", fftfile);
-		printf("Device              %s\n", dev.name);
-		printf("Compatibility       %d.%d\n", dev.major, dev.minor);
-		printf("clockRate (MHz)     %d\n", dev.clockRate / 1000);
-		printf("memClockRate (MHz)  %d\n", dev.memoryClockRate / 1000);
-		printf("\n  fft    max exp  ms/iter\n");
-		for (i = 0; i < end; i++) {
-			if (total[i] > 0.0f) {
-				int tl = (int) (exp(0.9784876919 * log((double) cufftbench_s + i)) * 22366.92473079 / 1.01);
-				if (tl % 2 == 0)
-					tl -= 1;
-				while (!isprime(tl))
-					tl -= 2;
-				printf("%5d %10d %8.4f\n", cufftbench_s + i, tl, total[i] / passes);
+		FILE *fptr;
+
+		sprintf(fftfile, "%s_fft.txt", devname);
+		fptr = fopen(fftfile, "w");
+		if (!fptr) {
+			printf("Cannot open %s.\n", fftfile);
+			printf("Device              %s\n", dev.name);
+			printf("Compatibility       %d.%d\n", dev.major, dev.minor);
+			printf("clockRate (MHz)     %d\n", dev.clockRate / 1000);
+			printf("memClockRate (MHz)  %d\n", dev.memoryClockRate / 1000);
+			printf("\n  fft    max exp  ms/iter\n");
+			for (i = 0; i < end; i++) {
+				if (total[i] > 0.0f) {
+					int tl = (int)(exp(0.9784876919 * log((double)cufftbench_s + i)) * 22366.92473079 / 1.01);
+					if (tl % 2 == 0)
+						tl -= 1;
+					while (!isprime(tl))
+						tl -= 2;
+					printf("%5d %10d %8.4f\n", cufftbench_s + i, tl, total[i] / passes);
+				}
 			}
+			fflush(NULL);
 		}
-		fflush (NULL);
-	} else {
-		fprintf(fptr, "Device              %s\n", dev.name);
-		fprintf(fptr, "Compatibility       %d.%d\n", dev.major, dev.minor);
-		fprintf(fptr, "clockRate (MHz)     %d\n", dev.clockRate / 1000);
-		fprintf(fptr, "memClockRate (MHz)  %d\n", dev.memoryClockRate / 1000);
-		fprintf(fptr, "\n  fft    max exp  ms/iter\n");
-		for (i = 0; i < end; i++) {
-			if (total[i] > 0.0f) {
-				int tl = (int) (exp(0.9784876919 * log((double) cufftbench_s + i)) * 22366.92473079 / 1.01);
-				if (tl % 2 == 0)
-					tl -= 1;
-				while (!isprime(tl))
-					tl -= 2;
-				fprintf(fptr, "%5d %10d %8.4f\n", cufftbench_s + i, tl, total[i] / passes);
+		else {
+			fprintf(fptr, "Device              %s\n", dev.name);
+			fprintf(fptr, "Compatibility       %d.%d\n", dev.major, dev.minor);
+			fprintf(fptr, "clockRate (MHz)     %d\n", dev.clockRate / 1000);
+			fprintf(fptr, "memClockRate (MHz)  %d\n", dev.memoryClockRate / 1000);
+			fprintf(fptr, "\n  fft    max exp  ms/iter\n");
+			for (i = 0; i < end; i++) {
+				if (total[i] > 0.0f) {
+					int tl = (int)(exp(0.9784876919 * log((double)cufftbench_s + i)) * 22366.92473079 / 1.01);
+					if (tl % 2 == 0)
+						tl -= 1;
+					while (!isprime(tl))
+						tl -= 2;
+					fprintf(fptr, "%5d %10d %8.4f\n", cufftbench_s + i, tl, total[i] / passes);
+				}
 			}
+			fclose(fptr);
+			printf("Optimal fft lengths saved in %s.\nPlease email a copy to james@mersenne.ca.\n", fftfile);
+			fflush(NULL);
 		}
-		fclose(fptr);
-		printf("Optimal fft lengths saved in %s.\nPlease email a copy to james@mersenne.ca.\n", fftfile);
-		fflush (NULL);
 	}
 
 	free((char *) total);
