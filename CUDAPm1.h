@@ -26,7 +26,19 @@ extern int polite, polite_f;
 extern int fftlen, fft_count;
 extern int device_number;
 
+extern char input_filename[132], RESULTSFILE[132];
+extern char INIFILE[132];
+extern char AID[132];  // Assignment key
+extern char s_residue[32];
+extern int tfdepth, llsaved;
+extern int g_b1_commandline;
+extern int g_b2_commandline;
+extern int selftest;
+
 void unpack_bits_int(int *x_int, unsigned *packed_x, int q, int n);
 void balance_digits_int(int* x, int q, int n);
+int check_pm1(int q, char *expectedResidue);
+void parse_args(int argc, char *argv[], int* q, int* device_numer, int* cufftbench_s, int* cufftbench_e, int* cufftbench_d);
+/* The rest of the opts are global */
 
 #endif /* CUDAPM1_H_ */

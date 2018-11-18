@@ -43,6 +43,7 @@ char program[] = "CUDAPm1 v0.21";
 #include "cuda/cuda_functions.h"
 #include "lucas.h"
 #include "bench.h"
+#include "selftest.h"
 
 double *g_ttmp, *g_ttp1;
 double *g_x, *g_ct;
@@ -419,15 +420,15 @@ int fft_from_str(const char* str)
 }
 
 //From apsen
-void print_time_from_seconds(int sec) {
+void print_time_from_seconds(FILE *output, int sec) {
 	if (sec > 3600) {
-		printf("%d", sec / 3600);
+		fprintf(output, "%d", sec / 3600);
 		sec %= 3600;
-		printf(":%02d", sec / 60);
+		fprintf(output, ":%02d", sec / 60);
 	} else
-		printf("%d", sec / 60);
+		fprintf(output, "%d", sec / 60);
 	sec %= 60;
-	printf(":%02d", sec);
+	fprintf(output, ":%02d", sec);
 }
 
 void init_device(int device_number) {
@@ -576,38 +577,41 @@ read_checkpoint_packed(int q) {
 	
 	x_packed = (unsigned *) malloc(sizeof(unsigned) * (end + 25));
 	
-	sprintf(chkpnt_cfn, "c%ds1", q);
-	sprintf(chkpnt_tfn, "t%ds1", q);
-	fPtr = fopen(chkpnt_cfn, "rb");
-	if (!fPtr) {
+	if (selftest == 0) { /* Don't use checkpoints for self-tests */
+		sprintf(chkpnt_cfn, "c%ds1", q);
+		sprintf(chkpnt_tfn, "t%ds1", q);
+		fPtr = fopen(chkpnt_cfn, "rb");
+		if (!fPtr) {
 //#ifndef _MSC_VER
 //if(stat(chkpnt_cfn, &FileAttrib) == 0) fprintf (stderr, "\nUnable to open the checkpoint file. Trying the backup file.\n");
 //#endif
-	} else if (fread(x_packed, 1, sizeof(unsigned) * (end + 25), fPtr) != (sizeof(unsigned) * (end + 25))) {
-		fprintf(stderr, "\nThe checkpoint appears to be corrupt. Trying the backup file.\n");
-		fclose(fPtr);
-	} else if (x_packed[end] != (unsigned int) q) {
-		fprintf(stderr, "\nThe checkpoint appears to be corrupt. Trying the backup file.\n");
-		fclose(fPtr);
-	} else {
-		fclose(fPtr);
-		return x_packed;
-	}
-	fPtr = fopen(chkpnt_tfn, "rb");
-	if (!fPtr) {
+			} else if (fread(x_packed, 1, sizeof(unsigned) * (end + 25), fPtr) != (sizeof(unsigned) * (end + 25))) {
+				fprintf(stderr, "\nThe checkpoint appears to be corrupt. Trying the backup file.\n");
+				fclose(fPtr);
+			} else if (x_packed[end] != (unsigned int) q) {
+				fprintf(stderr, "\nThe checkpoint appears to be corrupt. Trying the backup file.\n");
+				fclose(fPtr);
+			} else {
+				fclose(fPtr);
+				return x_packed;
+			}
+		fPtr = fopen(chkpnt_tfn, "rb");
+		if (!fPtr) {
 //#ifndef _MSC_VER
 //    if(stat(chkpnt_cfn, &FileAttrib) == 0) fprintf (stderr, "\nUnable to open the backup file. Restarting test.\n");
 //#endif
-	} else if (fread(x_packed, 1, sizeof(unsigned) * (end + 25), fPtr) != (sizeof(unsigned) * (end + 25))) {
-		fprintf(stderr, "\nThe backup appears to be corrupt. Restarting test.\n");
-		fclose(fPtr);
-	} else if (x_packed[end] != (unsigned int) q) {
-		fprintf(stderr, "\nThe backup appears to be corrupt. Restarting test.\n");
-		fclose(fPtr);
-	} else {
-		fclose(fPtr);
-		return x_packed;
+			} else if (fread(x_packed, 1, sizeof(unsigned) * (end + 25), fPtr) != (sizeof(unsigned) * (end + 25))) {
+				fprintf(stderr, "\nThe backup appears to be corrupt. Restarting test.\n");
+				fclose(fPtr);
+			} else if (x_packed[end] != (unsigned int) q) {
+				fprintf(stderr, "\nThe backup appears to be corrupt. Restarting test.\n");
+				fclose(fPtr);
+			} else {
+				fclose(fPtr);
+				return x_packed;
+			}
 	}
+
 	x_packed[end] = q;
 	x_packed[end + 1] = 0;  // n
 	x_packed[end + 2] = 1;  // iteration number
@@ -625,6 +629,10 @@ read_checkpoint_packed(int q) {
 
 int read_st2_checkpoint(int q, unsigned *x_packed) {
 	//struct stat FileAttrib;
+
+	if (selftest != 0) /* Don't use checkpoints for self-tests */
+			return 0;
+
 	FILE *fPtr;
 	char chkpnt_cfn[32];
 	char chkpnt_tfn[32];
@@ -692,6 +700,9 @@ void set_checkpoint_data(unsigned *x_packed, int q, int n, int j, int stage, int
 }
 
 void write_checkpoint_packed(unsigned *x_packed, int q) {
+	if (selftest != 0) /* Don't use checkpoints for self-tests */
+			return;
+
 	int end = (q + 31) / 32;
 	FILE *fPtr;
 	char chkpnt_cfn[32];
@@ -725,6 +736,9 @@ void write_checkpoint_packed(unsigned *x_packed, int q) {
 }
 
 void write_st2_checkpoint(unsigned *x_packed, int q) {
+	if (selftest != 0) /* Don't use checkpoints for self-tests */
+		return;
+
 	int end = (q + 31) / 32;
 	FILE *fPtr;
 	char chkpnt_cfn[32];
@@ -956,6 +970,12 @@ unsigned *get_control(int *j, int lim1, int lim2, int q) {
 	return control;
 }
 
+unsigned long long mpz2ull(mpz_t z) {
+    unsigned long long result = 0;
+    mpz_export(&result, 0, -1, sizeof result, 0, 0, z);
+    return result;
+}
+
 int get_gcd(unsigned *x_packed, int q, int n, int stage) {
 	mpz_t result, prime, prime1;
 	int end = (q + 31) / 32;
@@ -979,27 +999,32 @@ int get_gcd(unsigned *x_packed, int q, int n, int stage) {
 				printf(" (P-1, B1=%d, B2=%d, e=%d, n=%dK %s)\n", b1, b1, g_e, n / 1024, program);  // Found in stage 1
 			else
 				printf(" (P-1, B1=%d, B2=%d, e=%d, n=%dK %s)\n", b1, g_b2, g_e, n / 1024, program);
-			FILE* fp = fopen_and_lock(RESULTSFILE, "a");
-			fprintf(fp, "M%d has a factor: ", q);
-			mpz_out_str(fp, 10, prime1);
-			if (AID[0] && strncasecmp(AID, "N/A", 3)) {
-				if (stage == 1)
-					fprintf(fp, " (P-1, B1=%d, B2=%d, e=%d, n=%dK, aid=%s %s)\n", b1, b1, g_e, n / 1024, AID, program);
-				else
-					fprintf(fp, " (P-1, B1=%d, B2=%d, e=%d, n=%dK, aid=%s %s)\n", b1, g_b2, g_e, n / 1024, AID, program);
+			if (selftest == 0) {
+				FILE* fp = fopen_and_lock(RESULTSFILE, "a");
+
+				fprintf(fp, "M%d has a factor: ", q);
+				mpz_out_str(fp, 10, prime1);
+				if (AID[0] && strncasecmp(AID, "N/A", 3)) {
+					if (stage == 1)
+						fprintf(fp, " (P-1, B1=%d, B2=%d, e=%d, n=%dK, aid=%s %s)\n", b1, b1, g_e, n / 1024, AID, program);
+					else
+						fprintf(fp, " (P-1, B1=%d, B2=%d, e=%d, n=%dK, aid=%s %s)\n", b1, g_b2, g_e, n / 1024, AID, program);
+				} else {
+					if (stage == 1)
+						fprintf(fp, " (P-1, B1=%d, B2=%d, e=%d, n=%dK %s)\n", b1, b1, g_e, n / 1024, program);
+					else
+						fprintf(fp, " (P-1, B1=%d, B2=%d, e=%d, n=%dK %s)\n", b1, g_b2, g_e, n / 1024, program);
+				}
+				unlock_and_fclose(fp);
 			} else {
-				if (stage == 1)
-					fprintf(fp, " (P-1, B1=%d, B2=%d, e=%d, n=%dK %s)\n", b1, b1, g_e, n / 1024, program);
-				else
-					fprintf(fp, " (P-1, B1=%d, B2=%d, e=%d, n=%dK %s)\n", b1, g_b2, g_e, n / 1024, program);
+				st_result = mpz2ull(prime1);
 			}
-			unlock_and_fclose(fp);
 		}
 	}
 	if (rv == 0) {
 		printf("M%d Stage %d found no factor", q, stage);
 		printf(" (P-1, B1=%d, B2=%d, e=%d, n=%dK %s)\n", b1, g_b2, g_e, n / 1024, program);
-		if (stage == 2) {
+		if (stage == 2 && selftest == 0) {
 			FILE* fp = fopen_and_lock(RESULTSFILE, "a");
 			fprintf(fp, "M%d found no factor", q);
 			if (AID[0] && strncasecmp(AID, "N/A", 3))
@@ -1819,7 +1844,7 @@ int stage2(int *x_int, unsigned *x_packed, int q, int n, int nrp, float err) {
 			if (m == 0 && k == ks)
 				printf("NA");
 			else
-				print_time_from_seconds(
+				print_time_from_seconds(stdout,
 						(int) (itime * ((double) itran_tot / itran_done - 1) + ptime * ((double) ptran_tot / ptran_done - 1)));
 		}
 		printf(")\n");
@@ -1907,9 +1932,9 @@ int stage2(int *x_int, unsigned *x_packed, int q, int n, int nrp, float err) {
 					printf("Transforms: %5d ", num_tran - tran_save);
 					printbits_int(x_int, q, n, 0, 0, NULL, 0);
 					printf(" err = %5.5f (", err);
-					print_time_from_seconds((int) time1.tv_sec - time0.tv_sec);
+					print_time_from_seconds(stdout, (int) time1.tv_sec - time0.tv_sec);
 					printf(" real, %4.4f ms/tran, ETA ", time / 1000.0 / (num_tran - tran_save));
-					print_time_from_seconds(
+					print_time_from_seconds(stdout,
 							(int) itime * ((double) itran_tot / itran_done - 1)
 									+ ptime * ((double) ptran_tot / (ptran_done + num_tran) - 1));
 					printf(")\n");
@@ -1935,7 +1960,7 @@ int stage2(int *x_int, unsigned *x_packed, int q, int n, int nrp, float err) {
 			printf("Stage 2 complete, %d transforms, estimated total time = ", ptran_done + itran_done);
 		else
 			printf("Quitting, estimated time spent = ");
-		print_time_from_seconds((int) itime + ptime);
+		print_time_from_seconds(stdout, (int) itime + ptime);
 		printf("\n");
 	} else if (quitting == 2)
 		printf("err = %5.5g >= 0.40, quitting.\n", err);
@@ -2098,9 +2123,9 @@ int check_pm1(int q, char *expectedResidue) {
 					long long diff2 = (last - j) * diff1 / ((checkpoint_iter - j_resume) * 1e6);
 					gettimeofday(&time0, NULL);
 					printf(" err = %5.5f (", maxerr);
-					print_time_from_seconds((int) diff);
+					print_time_from_seconds(stdout, (int) diff);
 					printf(" real, %4.4f ms/iter, ETA ", diff1 / 1000.0 / (checkpoint_iter - j_resume));
-					print_time_from_seconds((int) diff2);
+					print_time_from_seconds(stdout, (int) diff2);
 					printf(")\n");
 					fflush(stdout);
 					if (j_resume)
@@ -2108,7 +2133,7 @@ int check_pm1(int q, char *expectedResidue) {
 					reset_err(&maxerr, 0.85);  // Instead of tracking maxerr over whole run, reset it at each checkpoint.
 				} else {
 					printf("Estimated time spent so far: ");
-					print_time_from_seconds(total_time);
+					print_time_from_seconds(stdout, total_time);
 					printf("\n\n");
 					j = last + 1;
 				}
@@ -2134,7 +2159,7 @@ int check_pm1(int q, char *expectedResidue) {
 				printbits_int(x_int, q, n, 0, NULL, 0, 1);
 				total_time += (time1.tv_sec - start_time);
 				printf("\nStage 1 complete, estimated total time = ");
-				print_time_from_seconds(total_time);
+				print_time_from_seconds(stdout, total_time);
 				fflush(stdout);
 				printf("\nStarting stage 1 gcd.\n");
 				st1_factor = get_gcd(/*x,*/x_packed, q, n, 1);
@@ -2173,8 +2198,6 @@ int dir_exists(const char *path) {
 		return 0;
 }
 
-void parse_args(int argc, char *argv[], int* q, int* device_numer, int* cufftbench_s, int* cufftbench_e, int* cufftbench_d);
-/* The rest of the opts are global */
 int main(int argc, char *argv[]) {
 	printf("%s\n", program);
 	quitting = 0;
@@ -2209,6 +2232,7 @@ int main(int argc, char *argv[]) {
 	cufftbench_s = cufftbench_e = cufftbench_d = 0;
 	
 	parse_args(argc, argv, &q, &device_number, &cufftbench_s, &cufftbench_e, &cufftbench_d);
+
 	/* The rest of the args are globals */
 
 	if (file_exists(INIFILE)) {
@@ -2286,7 +2310,7 @@ int main(int argc, char *argv[]) {
 		exit(2);
 	}
 	f_f = fftlen;  // if the user has given an override... then note this length must be kept between tests
-			
+
 	init_device(device_number);
 	fft_count = init_ffts();
 	
@@ -2306,7 +2330,10 @@ int main(int argc, char *argv[]) {
 				}
 			}
 		}
-		if (q <= 0) {
+
+		if (selftest)
+			run_selftests(selftest);
+		else if (q <= 0) {
 			int error;
 			
 #ifdef EBUG
@@ -2383,10 +2410,12 @@ void parse_args(int argc, char *argv[], int* q, int* device_number, int* cufftbe
 			fprintf(stderr, "                       -b2         set b2\n\n");
 			fprintf(stderr, "                       -d2         Brent-Suyama coefficient (multiple of 30, 210, or 2310) \n\n");
 			fprintf(stderr, "                       -e2         Brent-Suyama exponent (2-12) \n\n");
-			fprintf(stderr, "                       -selftest   Run a quick selftest\n");
-			fprintf(stderr, "                       -selftest2  Run a longer selftest\n\n");
-//fprintf (stderr,  // Now an internal parameter
-//     "                       -nrp2       Relative primes per pass (divisor of 8, 48, or 480)\n\n");
+			fprintf(stderr, "                       -selftest   Run a quick selftest (ETA: ");
+			print_time_from_seconds(stderr, summarise_selftests(1));
+			fprintf(stderr, ")\n");
+			fprintf(stderr, "                       -selftest2  Run a longer selftest (ETA: ");
+			print_time_from_seconds(stderr, summarise_selftests(2));
+			fprintf(stderr, ")\n\n");
 			exit(2);
 		} else if (strcmp(argv[1], "-v") == 0) {
 			printf("%s\n\n", program);
@@ -2536,12 +2565,15 @@ void parse_args(int argc, char *argv[], int* q, int* device_number, int* cufftbe
 			g_eb1 = atoi(argv[2]);
 			argv += 2;
 			argc -= 2;
-/*		} else if (strcmp(argv[1], "-selftest") == 0) {
+		} else if (strcmp(argv[1], "-selftest") == 0) {
 			selftest = 1;
-			if (strcmp(argv[1], "-selftest2") == 0) {
-				selftest = 2;
-			}
-*/		} else {
+			argv++;
+			argc--;
+		} else if (strcmp(argv[1], "-selftest2") == 0) {
+			selftest = 2;
+			argv++;
+			argc--;
+		} else {
 			if (*q != -1 || strcmp(input_filename, "") != 0) {
 				fprintf(stderr, "can't parse options\n\n");
 				exit(2);
