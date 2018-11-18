@@ -107,10 +107,8 @@ void remove_spaces (char* str_trimmed, const char* str_untrimmed);
 #include <sys/time.h>
 #include <unistd.h>
 #else
-typedef struct timeval {   
-	long tv_sec;
-	long tv_usec;
-} timeval;
+#include <winsock2.h>
+
 #ifdef __CUDACC__
 extern "C" int gettimeofday (struct timeval *tv, struct timezone *);
 #else /* __CUDAACC__ */

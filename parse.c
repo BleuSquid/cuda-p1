@@ -71,7 +71,6 @@
 #include <sched.h>
 #define MODE S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH
 
-#include "parse.h"
 static void Sleep(unsigned int ms) {
 	struct timespec ts;
 	ts.tv_sec = (time_t) ms / 1000;
@@ -79,8 +78,10 @@ static void Sleep(unsigned int ms) {
 	nanosleep(&ts, NULL);
 }
 #else
-#include <winsock2.h>
 #include <io.h>
+
+#include "parse.h"
+
 #undef open
 #undef close
 #define open _open
