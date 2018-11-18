@@ -775,6 +775,13 @@ int printbits_int(int *x_int, int q, int n, int offset, FILE* fp, char *expected
 	int j, k = 0;
 	int digit, bit;
 	unsigned long long temp, residue = 0;
+	unsigned long long bad_residues[18] = {
+		0x0000000000000000, 0x0000000000000001, 0xfff7fffbfffdfffe, 0xfff7fffbfffdffff,
+		0xfff7fffbfffffffe, 0xfff7fffbffffffff, 0xfff7fffffffdfffe, 0xfff7fffffffdffff,
+		0xfff7fffffffffffe, 0xfff7ffffffffffff, 0xfffffffbfffdfffe, 0xfffffffbfffdffff,
+		0xfffffffbfffffffe, 0xfffffffbffffffff, 0xfffffffffffdfffe, 0xfffffffffffdffff,
+		0xfffffffffffffffe, 0xffffffffffffffff
+	};
 	
 	digit = floor(offset * (n / (double) q));
 	bit = offset - ceil(digit * (q / (double) n));
@@ -790,7 +797,13 @@ int printbits_int(int *x_int, int q, int n, int offset, FILE* fp, char *expected
 		j = (j + 1) % n;
 	}
 	sprintf(s_residue, "%016llx", residue);
-	
+
+	for (j = 0; j < sizeof(bad_residues) / sizeof(bad_residues[0]); j++) {
+		if (residue == bad_residues[j]) {
+			printf("*** Current residue matches known bad value, aborting\n");
+			quitting = 1;
+		}
+	}
 	printf("M%d, 0x%s,", q, s_residue);
 	//if(o_f) printf(" offset = %d,", offset);
 	printf(" n = %dK, %s", n / 1024, program);
