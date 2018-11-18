@@ -259,13 +259,36 @@ void cufftbench(int cufftbench_s, int cufftbench_e, int passes, int device_numbe
 	cutilSafeCall(cudaEventDestroy(start));
 	cutilSafeCall(cudaEventDestroy(stop));
 
+	float totaltime = 0.0f;
+	unsigned int totallen = 0;
+
+	for (i = end - 1; i >0; i--) {
+		if (total[i] > 0.0f) {
+			totaltime += total[i] / float(passes);
+			totallen += cufftbench_s + i;
+		}
+	}
+
+	/* Average time/fftlength
+	Use the inverse for higher reliability from lower run-times.
+	*/
+	float totalavg = float(totallen) / totaltime;
+
+	printf("totalavg: %4.4f\ttotallen: %d\ttotaltime: %5.4f\n\n", totalavg, totallen, totaltime);
+
 	i = end - 1;
-	best_time = 10000.0f;
+	best_time = FLT_MAX;
 	while (i >= 0 && !quitting) {
-		if (total[i] > 0.0f && total[i] < best_time)
-			best_time = total[i];
-		else
+		if (total[i] > 0.0f && fabsf(((cufftbench_s + i) / total[i]) / totalavg) >= 5.0f) {
+			printf("Invalid timings for fft length %dK, removing from results\n", cufftbench_s + i);
 			total[i] = 0.0f;
+		}
+
+		if (total[i] > 0.0f && total[i] < best_time) {
+			best_time = total[i];
+		} else {
+			total[i] = 0.0f;
+		}
 		i--;
 	}
 
