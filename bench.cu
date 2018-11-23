@@ -2,13 +2,35 @@
 
 int isReasonable(int fft) {  //From an idea of AXN's mentioned on the forums
 	int i;
+	int b[4] = { 2, 3, 5, 7 };
+	double logb;
+	int maxv;
+	int out[4] = { 0, 0, 0, 0 };
 
-	while (!(fft & 1))
-		fft /= 2;
-	for (i = 3; i <= 7; i += 2)
-		while ((fft % i) == 0)
-			fft /= i;
-	return (fft);
+	for (i = 0; i < 4; i++) {
+		logb = log(b[i]);
+		/* determine max value of x^y to cover input fft*/
+		maxv = (int)ceil(log(fft) / logb);
+		while (maxv > 0) {
+			if (ceil((float)fft / powf(b[i], maxv)) == floor((float)fft / powf(b[i], maxv))) {
+				out[i] = maxv;
+				maxv = 0;
+			} else {
+				maxv--;
+			}
+		}
+	}
+
+	if (
+		(out[0] > 0 && out[1] > 0 && out[2] > 0 && out[3] > 0) /* best fftlen only have max 3 bases. if we need more, it's not automatically good */
+		|| powf(b[0], out[0]) *powf(b[1], out[1]) * powf(b[2],out[2]) *powf(b[3],out[3]) != fft /* if fft has a divisor outside of 2, 3, 5, or 7, this check will fail */
+		|| out[0]+out[1]+out[2]+out[3] == 0 /* none of these? must be invalid */
+		|| out[0] == 0 /* must have a base of 2 */
+		) {
+		return (0);
+	} else {
+		return (1);
+	}
 }
 
 void threadbench(int n, int passes, int device_number) {
@@ -223,7 +245,7 @@ void cufftbench(int cufftbench_s, int cufftbench_e, int passes, int device_numbe
 	cutilSafeCall(cudaEventCreateWithFlags(&stop, cudaEventBlockingSync));
 
 	for (j = cufftbench_s; j <= cufftbench_e && !quitting; j++) {
-		if (isReasonable(j) < 15) {
+		if (isReasonable(j) == 1) {
 			int n = j * 1024;
 			cufftSafeCall(cufftPlan1d(&plan, n / 2, CUFFT_Z2Z, 1));
 			for (k = 0; k < passes && !quitting; k++) {
