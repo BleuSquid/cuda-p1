@@ -72,6 +72,7 @@ int g_nrp = 0;
 int g_eb1 = 0;
 int keep_s1 = 0;
 int selftest = 0;
+int verbose = 0;
 
 char folder[132];
 char input_filename[132], RESULTSFILE[132];
@@ -174,7 +175,7 @@ void reset_err(float* maxerr, float value) {
 void E_init_d(double *g, double value, int n) {
 	double x[1] = {value};
 	
-	cutilSafeCall(cudaMemset(g, 0.0, sizeof(double) * n));
+	cutilSafeCall(cudaMemset(g, 0, sizeof(double) * n));
 	cudaMemcpy(g, x, sizeof(double), cudaMemcpyHostToDevice);
 }
 
@@ -225,7 +226,7 @@ int E_to_the_p(double *g_out, double *g_in, mpz_t p, int n, int trans, float *er
 	int checksave = trans / (2 * checkpoint_iter) * 2 * checkpoint_iter;
 	int sync = 1;
 	
-	last = mpz_sizeinbase(p, 2);
+	last = (int) mpz_sizeinbase(p, 2);
 	if (last == 1) {
 		E_init_d(g_out, 1.0, n);
 		if (mpz_tstbit(p, last - 1)) {
@@ -512,7 +513,7 @@ int standardize_digits_int(int *x_int, int q, int n, int offset, int num_digits)
 	int lo = 1 << qn;
 	int hi = lo << 1;
 	
-	digit = floor(offset * (n / (double) q));
+	digit = (int) floor(offset * (n / (double) q));
 	j = (n + digit - 1) % n;
 	while (x_int[j] == 0 && j != digit)
 		j = (n + j - 1) % n;
@@ -782,8 +783,8 @@ int printbits_int(int *x_int, int q, int n, int offset, FILE* fp, char *expected
 		0xfffffffffffffffe, 0xffffffffffffffff
 	};
 	
-	digit = floor(offset * (n / (double) q));
-	bit = offset - ceil(digit * (q / (double) n));
+	digit = (int) floor(offset * (n / (double) q));
+	bit = offset - (int) ceil(digit * (q / (double) n));
 	j = digit;
 	while (k < 64) {
 		temp = x_int[j];
@@ -912,7 +913,7 @@ int round_off_test(int q, int n, int *j, unsigned *control, int last) {
 		if (terr > max_err1)
 			max_err1 = terr;
 		totalerr += terr;
-		reset_err(&maxerr, 0.85);
+		reset_err(&maxerr, (float) 0.85);
 		if (terr >= 0.35) {
 			printf("Iteration = %d < 1000 && err = %5.5f >= 0.35, increasing n from %dK\n", k, terr, n / 1024);
 			fftlen++;
@@ -923,7 +924,7 @@ int round_off_test(int q, int n, int *j, unsigned *control, int last) {
 			max_err = 0.0;
 		}
 	}
-	avgerr = totalerr / 1000.0;
+	avgerr = totalerr / (float) 1000.0;
 	if (avgerr > 0.25) {
 		printf("Iteration 1000, average error = %5.5f > 0.25 (max error = %5.5f), increasing FFT length and restarting\n", avgerr, max_err);
 		fftlen++;
@@ -933,7 +934,7 @@ int round_off_test(int q, int n, int *j, unsigned *control, int last) {
 		exit(2);
 	} else {
 		printf("Iteration 1000, average error = %5.5f <= 0.25 (max error = %5.5f), continuing test.\n", avgerr, max_err1);
-		reset_err(&maxerr, 0.85);
+		reset_err(&maxerr, (float) 0.85);
 	}
 	*j += 1000;
 	return 0;
@@ -978,7 +979,7 @@ unsigned *get_control(int *j, int lim1, int lim2, int q) {
 		}
 		
 	}
-	*j = mpz_sizeinbase(result, 2);
+	*j = (int) mpz_sizeinbase(result, 2);
 	control = (unsigned *) malloc(sizeof(unsigned) * ((*j + 31) / 32));
 	mpz_export(control, NULL, -1, 4, 0, 0, result);
 	mpz_clear(result);
@@ -992,6 +993,7 @@ unsigned long long mpz2ull(mpz_t z) {
 }
 
 int get_gcd(unsigned *x_packed, int q, int n, int stage) {
+	fflush(stdout);
 	mpz_t result, prime, prime1;
 	int end = (q + 31) / 32;
 	int rv = 0;
@@ -1050,6 +1052,7 @@ int get_gcd(unsigned *x_packed, int q, int n, int stage) {
 		}
 		
 	}
+	fflush(stdout);
 	mpz_clear(result);
 	mpz_clear(prime);
 	mpz_clear(prime1);
@@ -1533,23 +1536,24 @@ int rp_init_count2a(int cur_rp, int e, int n, uint8 *gaps) {
 	return trans;
 }
 
-int stage2(int *x_int, unsigned *x_packed, int q, int n, int nrp, float err) {
+int stage2(int* x_int, unsigned* x_packed, int q, int n, int nrp, float err) {
 	int j, i = 0, t;
 	int e, d, b2 = g_b2;
 	int rpt = 0, rp;
 	int ks, ke, m = 0, k;
+	int max_ke = 0;
 	int last = 0;
-	uint8 *bprimes = NULL;
+	uint8* bprimes = NULL;
 	int prime, prime_pair;
-	uint8 *rp_gaps = NULL;
-	int sprimes[] = {3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 43, 47, 53, 0};
-	uint8 two_to_i[] = {1, 2, 4, 8, 16, 32, 64, 128};
+	uint8* rp_gaps = NULL;
+	int sprimes[] = { 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 43, 47, 53, 0 };
+	uint8 two_to_i[] = { 1, 2, 4, 8, 16, 32, 64, 128 };
 	int count0 = 0, count1 = 0, count2 = 0;
 	mpz_t control;
 	timeval time0, time1;
-	
+
 	{
-		int best_guess = 0x01111111;
+		int best_guess = 0x11111111;
 		int best_d = 0, best_e = 0, best_nrp = 0;
 		int guess;
 		int passes;
@@ -1557,7 +1561,7 @@ int stage2(int *x_int, unsigned *x_packed, int q, int n, int nrp, float err) {
 		int nrpe = 0;
 		int start_e = 2, end_e = 12;
 		int start_d = 9240, d_div = 1;
-		
+
 		if (g_e) {
 			start_e = g_e;
 			end_e = g_e;
@@ -1570,29 +1574,32 @@ int stage2(int *x_int, unsigned *x_packed, int q, int n, int nrp, float err) {
 			if (d >= 2310) {
 				rpt = d / 2310 * 480;
 				i = 4;
-			} else if (d >= 210) {
+			}
+			else if (d >= 210) {
 				rpt = d / 210 * 48;
 				i = 3;
-			} else if (d >= 30) {
+			}
+			else if (d >= 30) {
 				rpt = d / 30 * 8;
 				i = 2;
 			}
-//else if(d >= 6)
-// {
-//  rpt = d / 6 * 2;
-//  i = 1;
-//}
+			//else if(d >= 6)
+			// {
+			//  rpt = d / 6 * 2;
+			//  i = 1;
+			//}
 			if (b1 * sprimes[i] * 53 < b2)
 				ks = ((((b1 * 53 + 1) >> 1) + d - 1) / d - 1) * d;
-			else if (b1 * sprimes[i] < b2)
+			else if (b1* sprimes[i] < b2)
 				ks = ((((b2 / sprimes[i] + 1) >> 1) + d - 1) / d - 1) * d;
 			else
 				ks = ((((b1 + 1) >> 1) + d - 1) / d - 1) * d;
 			ke = ((((b2 + 1) >> 1) + d - 1) / d) * d;
+			max_ke = ke > max_ke ? ke : max_ke;
 			ks = ((ks / d) << 1) + 1;
 			ke = (ke / d) << 1;
-			
-			for (e = start_e; e <= end_e; e += 2) {
+
+			for (e = start_e; e <= end_e || best_d == 0; e += 2) {
 				nrpe = nrp - e - 1;
 				if (nrpe <= 0)
 					break;
@@ -1603,15 +1610,15 @@ int stage2(int *x_int, unsigned *x_packed, int q, int n, int nrp, float err) {
 				for (su = 0; su < rpt; su += nrpe)
 					guess += rp_init_count1a((su * d / rpt) | 1, 1, e, n);
 				guess += 2 * e * (d / 2 - passes) - e * e / 2;
-				double numprimes = (double) ke * d / (log((double) ke * d) - 1.0) - (double) b1 / (log((double) b1) - 1.0);
-				double numpairings = numprimes / 2.0 * numprimes / ((double) ((ke - ks) * d) * (double) rpt / d);
-				guess += e * (ke - ks) * passes + (2.2) * (int) (numprimes - numpairings);
+				double numprimes = (double)ke * d / (log((double)ke * d) - 1.0) - (double)b1 / (log((double)b1) - 1.0);
+				double numpairings = numprimes / 2.0 * numprimes / ((double)((ke - ks) * d) * (double)rpt / d);
+				guess += e * (ke - ks) * passes + (int)((2.2) * (numprimes - numpairings));
 				if (e == 4)
-					guess = (int) guess * 0.87;
+					guess = (int)((float)guess * (float)0.87);
 				if (e == 6)
-					guess = (int) guess * 0.82;
+					guess = (int)((float)guess * (float)0.82);
 				if (e == 12)
-					guess = (int) guess * 0.75;
+					guess = (int)((float)guess * (float)0.75);
 				if (guess < best_guess) {
 					best_guess = guess;
 					best_d = d;
@@ -1625,15 +1632,19 @@ int stage2(int *x_int, unsigned *x_packed, int q, int n, int nrp, float err) {
 				d -= 210;
 			else if (d >= 30)
 				d -= 30;
-//else if(d>=6) d -= 6;
+			//else if(d>=6) d -= 6;
 		}
 		d = best_d;
 		e = best_e;
 		nrp = best_nrp;
 	}
-	if (d == 0)
+	if (d == 0) {
+		// We need a better explanation for why we abort here
+		// It seems we should not end up here unless there are overflows in the above calculations
+		printf("Exiting, d = 0\n");
 		exit(3);
-	
+	}
+
 	int end = (q + 31) / 32;
 	if (x_packed[end + 10] == 0) {
 		x_packed[end + 10] = b2;
@@ -1675,8 +1686,10 @@ int stage2(int *x_int, unsigned *x_packed, int q, int n, int nrp, float err) {
 	else
 		ks = ((((b1 + 1) >> 1) + d - 1) / d - 1) * d;
 	ke = ((((b2 + 1) >> 1) + d - 1) / d) * d;
-	
-	bprimes = (uint8*) malloc(ke * sizeof(uint8));
+
+	max_ke = ke > max_ke ? ke : max_ke;
+	bprimes = (uint8*) malloc(max_ke * sizeof(uint8));
+
 	if (!bprimes) {
 		printf("failed to allocate bprimes\n");
 		exit(1);
@@ -1700,11 +1713,21 @@ int stage2(int *x_int, unsigned *x_packed, int q, int n, int nrp, float err) {
 	printf("rp_data: Attempting to cudaMalloc %d MB\n", sizeof(double) * n * nrp / 1024 / 1024);
 #endif
 	cutilSafeCall(cudaMalloc((void **) &rp_data, sizeof(double) * n * nrp));
+	cutilSafeCall(cutilDeviceSynchronize());
+	if (verbose) {
+		printf("cudaMalloc(rp_data): %s\n", cudaGetErrorString(cudaGetLastError()));
+		fflush(stdout);
+	}
 #ifdef EBUG
 	printf("e_data: Attempting to cudaMalloc %d MB\n", sizeof(double) * n * (e + 1) /1024 / 1024);
 #endif
 	cutilSafeCall(cudaMalloc((void **) &e_data, sizeof(double) * n * (e + 1)));
+	cutilSafeCall(cutilDeviceSynchronize());
 	
+	if (verbose) {
+		printf("cudaMalloc(e_data): %s\n", cudaGetErrorString(cudaGetLastError()));
+		fflush(stdout);
+	}
 	for (j = (b1 + 1) >> 1; j < ks; j++) {
 		if (bprimes[j] == 1) {
 			m = i;
@@ -1717,6 +1740,9 @@ int stage2(int *x_int, unsigned *x_packed, int q, int n, int nrp, float err) {
 				if (prime > ke)
 					break;
 				prime_pair = prime + d - 1 - ((prime % d) << 1);
+				if (prime_pair > ke) {
+					break;
+				}
 				bprimes[last] = 0;
 				bprimes[prime] = 1;
 				if (bprimes[prime_pair])
@@ -1950,8 +1976,8 @@ int stage2(int *x_int, unsigned *x_packed, int q, int n, int nrp, float err) {
 					print_time_from_seconds(stdout, (int) time1.tv_sec - time0.tv_sec);
 					printf(" real, %4.4f ms/tran, ETA ", time / 1000.0 / (num_tran - tran_save));
 					print_time_from_seconds(stdout,
-							(int) itime * ((double) itran_tot / itran_done - 1)
-									+ ptime * ((double) ptran_tot / (ptran_done + num_tran) - 1));
+							(int) (itime * ((double) itran_tot / (double) itran_done - 1)
+									+ ptime * ((double) ptran_tot / (double) (ptran_done + num_tran) - 1)));
 					printf(")\n");
 					fflush (stdout);
 					tran_save = num_tran;
@@ -1975,7 +2001,7 @@ int stage2(int *x_int, unsigned *x_packed, int q, int n, int nrp, float err) {
 			printf("Stage 2 complete, %d transforms, estimated total time = ", ptran_done + itran_done);
 		else
 			printf("Quitting, estimated time spent = ");
-		print_time_from_seconds(stdout, (int) itime + ptime);
+		print_time_from_seconds(stdout, (int) (itime + ptime));
 		printf("\n");
 	} else if (quitting == 2)
 		printf("err = %5.5g >= 0.40, quitting.\n", err);
@@ -2033,7 +2059,7 @@ int check_pm1(int q, char *expectedResidue) {
 		
 		g_d = g_d_commandline;
 		if (g_nrp == 0)
-			nrp = ((free_mem - (size_t) unused_mem * 1024 * 1024) / n / 8 - 7);
+			nrp = (int) ((free_mem - (size_t) unused_mem * 1024 * 1024) / n / 8 - 7);
 #ifdef ENV32BIT
 		if (nrp > (4096/sizeof(double))*1024*1024/n)
 			nrp = (4096/sizeof(double))*1024*1024/n;  // Max single allocation of 4 GB on 32-bit architectures?
@@ -2135,7 +2161,7 @@ int check_pm1(int q, char *expectedResidue) {
 					printbits_int(x_int, q, n, 0, 0, NULL, 0);
 					long long diff = time1.tv_sec - time0.tv_sec;
 					long long diff1 = 1000000 * diff + time1.tv_usec - time0.tv_usec;
-					long long diff2 = (last - j) * diff1 / ((checkpoint_iter - j_resume) * 1e6);
+					long long diff2 = (long long) ((last - j) * diff1 / ((checkpoint_iter - j_resume) * 1e6));
 					gettimeofday(&time0, NULL);
 					printf(" err = %5.5f (", maxerr);
 					print_time_from_seconds(stdout, (int) diff);
@@ -2145,7 +2171,7 @@ int check_pm1(int q, char *expectedResidue) {
 					fflush(stdout);
 					if (j_resume)
 						j_resume = 0;
-					reset_err(&maxerr, 0.85);  // Instead of tracking maxerr over whole run, reset it at each checkpoint.
+					reset_err(&maxerr, (float) 0.85);  // Instead of tracking maxerr over whole run, reset it at each checkpoint.
 				} else {
 					printf("Estimated time spent so far: ");
 					print_time_from_seconds(stdout, total_time);
@@ -2191,6 +2217,7 @@ int check_pm1(int q, char *expectedResidue) {
 					if (!quitting) {
 						printf("Starting stage 2 gcd.\n");
 						fflush(stdout);
+						
 						get_gcd(x_packed, q, n, 2);
 						rm_checkpoint(q, keep_s1);
 					}
@@ -2434,6 +2461,7 @@ void parse_args(int argc, char *argv[], int* q, int* device_number, int* cufftbe
 			fprintf(stderr, "$ CUDAPm1 [-d device_number] [-info] -cufftbench start end distance\n\n");
 			fprintf(stderr, "                       -h          print this help message\n");
 			fprintf(stderr, "                       -v          print version number\n");
+			fprintf(stderr, "                       -V          verbose\n");
 			fprintf(stderr, "                       -info       print device information\n");
 			fprintf(stderr, "                       -i          set .ini file name (default = \"CUDAPm1.ini\")\n");
 			fprintf(stderr, "                       -threads    set threads number (default = 256)\n");
@@ -2457,8 +2485,13 @@ void parse_args(int argc, char *argv[], int* q, int* device_number, int* cufftbe
 			fprintf(stderr, ")\n\n");
 			exit(2);
 		} else if (strcmp(argv[1], "-v") == 0) {
-			printf("%s\n\n", program);
+			// we already print the program version as the very first thing, so just exit
+			// printf("%s\n\n", program);
 			exit(2);
+		} else if (strcmp(argv[1], "-V") == 0) {
+			verbose = 1;
+			argv++;
+			argc--;
 		} else if (strcmp(argv[1], "-polite") == 0) {
 			if (argc < 3 || argv[2][0] == '-') {
 				fprintf(stderr, "can't parse -polite option\n\n");
@@ -2628,7 +2661,7 @@ void parse_args(int argc, char *argv[], int* q, int* device_number, int* cufftbe
 
 				// If q specified on cmd line, we aren't given tfdepth or llsaved.
 				// Estimate based on P95 defaults
-				tfdepth = ceil(log(*q) * 3.95);
+				tfdepth = (int) ceil(log(*q) * 3.95);
 				printf("Assuming exponent is trial factored to %d bits\n", tfdepth);
 				
 				// We know all exponents below this have been LL'd at least once.

@@ -13,9 +13,10 @@
 #endif
 
 int interact(void);
-#define RINT_x86(x) (floor(x+0.5))
+#define RINT_x86(x) (int) (floor((double)x + (double) 0.5))
 
-#define MAX_B2 1000000000
+//#define MAX_B2 1000000000
+#define MAX_B2 INT_MAX - 1
 
 extern double *g_ttmp, *g_ttp1;
 extern double *g_x, *g_ct;

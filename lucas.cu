@@ -103,7 +103,7 @@ int choose_fft_length(int q, int *index) {
 		}
 	} else {  // *index < 0, not override, choose length and set pointer to proper index
 		int i;
-		int estimate = ceil(1.01 * 0.0000358738168878758 * exp(1.0219834608 * log((double) q)));
+		int estimate = (int) ceil(1.01 * 0.0000358738168878758 * exp(1.0219834608 * log((double) q)));
 
 		for (i = 0; i < fft_count; i++) {
 			if (multipliers[i] >= estimate) {

@@ -408,7 +408,7 @@ enum PARSE_WARNINGS parse_worktodo_line(FILE *f_in, struct ASSIGNMENT *assignmen
 		if (ptr_start == ptr2)
 			return INVALID_FORMAT;  // no conversion
 		if (errno != 0 || proposed_exponent > INT_MAX) {
-			printf("Exponent too large \n");
+			printf("Input too large. Max exponent/b1/b2 = %d", INT_MAX);
 			return INVALID_DATA;
 		}
 #ifdef EBUG
@@ -745,7 +745,7 @@ int IniGetInt(const char *inifile, const char *name, int *value, int dflt) {
 		goto error;
 	while (fgets(buf, MAX_LINE_LENGTH, in) && !found) {
 		if (!strncmp(buf, name, strlen(name)) && buf[strlen(name)] == '=') {
-			if (sscanf(&(buf[strlen(name) + 1]), "%d", value) == 1)
+			if (sscanf_s(&(buf[strlen(name) + 1]), "%d", value) == 1)
 				found = 1;
 		}
 	}
